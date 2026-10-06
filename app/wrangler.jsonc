@@ -1,0 +1,19 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "stratosnotes",
+  "main": "worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [{ "binding": "FAUCET", "id": "c1569994e667444a93855abd7b87f43a" }],
+  "vars": {
+    "TEST_USDC": "ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6",
+    "RPC_URL": "https://api.devnet.solana.com"
+  }
+  // Secret: FAUCET_KEY (the test mint's authority, devnet only) — wrangler secret put FAUCET_KEY
+}

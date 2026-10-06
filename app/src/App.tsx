@@ -4,6 +4,7 @@ import Marketplace from './pages/Marketplace';
 import OfferingPage from './pages/Offering';
 import Issue from './pages/Issue';
 import Portfolio from './pages/Portfolio';
+import FaucetButton from './components/FaucetButton';
 import { DEPLOYMENT, explorer } from './config';
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
             <NavLink to="/portfolio">Portfolio</NavLink>
           </nav>
           <span className="pill net"><span className="dot" style={{ color: 'var(--accent)' }} />Solana devnet</span>
+          <FaucetButton />
           <WalletMultiButton />
         </div>
       </header>

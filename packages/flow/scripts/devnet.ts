@@ -64,9 +64,12 @@ async function issue(type: ProductType) {
   const units = [600, 400];
   const notional = units.reduce((a, b) => a + b, 0);
   const reserve = Math.ceil(notional * (reservePerUnit(p) ?? (p.participationPct ?? 0) / 100));
+  // The faucet key holds the test mint's authority once it has been handed over.
+  const faucetPath = join(KEYS, 'faucet.json');
+  const minter = existsSync(faucetPath) ? loadKp(faucetPath) : payer;
   const cash = async (owner: PublicKey, n: number) => {
     const ata = await getOrCreateAssociatedTokenAccount(conn, payer, usdc, owner);
-    await mintTo(conn, payer, usdc, ata.address, payer, BigInt(n) * 1_000_000n);
+    await mintTo(conn, payer, usdc, ata.address, minter, BigInt(n) * 1_000_000n);
   };
   await cash(payer.publicKey, reserve);
 
