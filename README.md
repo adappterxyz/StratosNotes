@@ -62,7 +62,10 @@ diagrams exported from Flow import unchanged.
 |---|---|
 | Every product pays its reference payoff | `npm run e2e`: six price paths (FCN autocalled and knocked in, reverse convertible, phoenix with memory, snowball called at maturity, PPN) on a local validator, two investors each, issued, subscribed, observed through a forwarder CPI, payouts withdrawn as SPL USDC and checked against the reference payoff |
 | CRE drives a real issuance on devnet | `cre workflow simulate --broadcast`: the keeper found the due strike fixing, read ETH/USD from Chainlink, and wrote it through Chainlink's simulator forwarder into the devnet engine (≈50k compute units, under CRE's 300k cap); the next run delivered observation 1, the FCN autocalled, and both investors were paid par + coupon |
-| Compiler | unit tests: every product round-trips BPMN → IR → definition → bytes → decode |
+| A full lifecycle on devnet, CRE on a schedule, with a secondary transfer | Phoenix `8SvcVvQ8vYAtVdLs4gF3Rc1MNybqWh2kFfPCTpD1heGG`: issued, subscribed 600 + 400 units, then the keeper loop (CRE simulator every minute) fixed the strike and delivered observations 1 and 2 with nobody else acting; after the strike one investor sold 100 of 600 units; observation 2 autocalled. Paid: 525, 420 and 105 USDC for 500, 400 and 100 units (two 2.5% coupons + par) |
+| Every report fits CRE's compute cap | the e2e run measures each forwarder transaction: max 89k compute units (CRE allows 300k) |
+| AI | live Workers AI: term sheets to parameters (p.a. coupons converted, missing terms asked for, unsupported underlyings refused); edits to the open workflow as validated patches |
+| Compiler | unit tests: every product round-trips BPMN → IR → definition → bytes → decode, and BPMN → draft → BPMN |
 
 ## Deployed (Solana devnet)
 
@@ -104,7 +107,8 @@ simulated write) and `CRE_ETH_PRIVATE_KEY` (required by `--broadcast`); see
 ## Limits (hackathon scope)
 
 - Settlement is in cash (below the knock-in barrier a holder receives
-  final / strike); note units are tracked in the engine's ledger, not as SPL
-  tokens, so they are not transferable yet.
+  final / strike). Note units live in the engine's ledger: holders transfer
+  them in whole or in part with `transfer_units`, but they are not SPL tokens,
+  so wallets and DEXs do not see them.
 - Up to 64 holdings per issuance (about 30 investors) and 12 observations.
 - Field values are public on Solana; Flow's Canton target keeps them private.
