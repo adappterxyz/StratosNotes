@@ -256,6 +256,22 @@ pub mod flow_engine {
         }, &[seeds]), base)
     }
 
+    /// A holder moves note units (an ISSUED asset) to another key, in whole or
+    /// in part. Later coupons and redemptions pay whoever holds the units then:
+    /// distributions read this ledger.
+    pub fn transfer_units(ctx: Context<TransferUnits>, asset: u8, to: Pubkey, amount: i128) -> Result<()> {
+        let d = load(&ctx.accounts.definition.to_account_info())?;
+        let a = d.assets.get(asset as usize).ok_or(error!(EngineError::BadInputs))?;
+        require!(a.kind == akind::ISSUED, EngineError::NotTransferable);
+        require!(amount > 0 && to != Pubkey::default(), EngineError::BadInputs);
+        let from = ctx.accounts.signer.key();
+        let p = &mut ctx.accounts.process;
+        debit(p, from, asset, amount)?;
+        credit(p, to, asset, amount)?;
+        emit!(UnitsTransferred { process: p.key(), asset, from, to, amount });
+        Ok(())
+    }
+
     /// Chainlink CRE: the keystone forwarder CPIs here with a DON-verified report.
     pub fn on_report(ctx: Context<OnReport>, _metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
         // The forwarder program owns `state` and signs as PDA("forwarder", state, this program).
@@ -405,6 +421,24 @@ pub struct Withdraw<'info> {
     #[account(mut, seeds = [b"vault", process.key().as_ref(), &[asset]], bump)]
     pub vault: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
+}
+
+#[event]
+pub struct UnitsTransferred {
+    pub process: Pubkey,
+    pub asset: u8,
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub amount: i128,
+}
+
+#[derive(Accounts)]
+pub struct TransferUnits<'info> {
+    #[account(mut, has_one = definition)]
+    pub process: Account<'info, Process>,
+    /// CHECK: a sealed Definition owned by this program (checked in `load`).
+    pub definition: UncheckedAccount<'info>,
+    pub signer: Signer<'info>,
 }
 
 #[derive(Accounts)]

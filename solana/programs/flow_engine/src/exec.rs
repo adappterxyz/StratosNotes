@@ -101,7 +101,7 @@ fn xor_pick(p: &Process, d: &WorkflowDef, s: &StepDef) -> Result<Option<usize>> 
     Ok(s.next.iter().position(|e| e.is_default || e.cond == NO_EXPR))
 }
 
-fn credit(p: &mut Process, owner: Pubkey, asset: u8, amt: i128) -> Result<()> {
+pub fn credit(p: &mut Process, owner: Pubkey, asset: u8, amt: i128) -> Result<()> {
     if amt == 0 {
         return Ok(());
     }

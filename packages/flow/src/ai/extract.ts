@@ -1,0 +1,143 @@
+/**
+ * Term sheet -> ProductParams + this issuance's schedule (Flow's
+ * ai/extract-product.ts, for StratosNotes). The generation model fills a flat
+ * JSON schema (null for anything not stated); deterministic code converts
+ * coupons, applies documented defaults (each one a visible note), and
+ * validates; errors go back to the model for a bounded repair. What reaches
+ * the issuer is always a valid input to a verified payoff engine.
+ */
+import type { AiRunner, ChatMessage } from './runner';
+import { FEEDS, PRODUCT_LABELS, productUses, validateProductParams, type ProductParams, type ProductType } from '../products/params';
+
+export interface Schedule {
+  /** Observation spacing and count; the strike date is set when issuing. */
+  every: number;
+  unit: 'months' | 'days' | 'minutes';
+  count: number;
+  /** Size of this issuance, when stated. */
+  size?: number;
+}
+export interface ExtractedProduct { params: ProductParams; schedule: Schedule; notes: string[] }
+
+interface Draft {
+  productType: ProductType | null;
+  name: string | null;
+  size: number | null;
+  issuePricePct: number | null;
+  underlyingSymbol: string | null;
+  observationEveryMonths: number | null;
+  observationCount: number | null;
+  couponRatePct: number | null;
+  couponAsStated: string | null;
+  couponRateBasis: 'per-annum' | 'per-period' | null;
+  couponBarrierPct: number | null;
+  memory: boolean | null;
+  autocallLevelPct: number | null;
+  autocallFromPeriod: number | null;
+  knockInBarrierPct: number | null;
+  protectionPct: number | null;
+  participationPct: number | null;
+}
+
+const num = { type: ['number', 'null'] };
+const SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    productType: { type: ['string', 'null'], enum: [...Object.keys(PRODUCT_LABELS), null] },
+    name: { type: ['string', 'null'], description: 'Short display name, e.g. "12M Phoenix on ETH"' },
+    size: { ...num, description: 'Issuance size in USDC of face' },
+    issuePricePct: { ...num, description: 'Issue price, % of face' },
+    underlyingSymbol: { type: ['string', 'null'], description: 'Ticker, e.g. ETH, BTC, SOL' },
+    observationEveryMonths: { type: ['integer', 'null'] },
+    observationCount: { type: ['integer', 'null'], description: 'Number of observations; the last one is maturity' },
+    couponRatePct: { ...num, description: 'The coupon rate exactly as stated, % of face' },
+    couponAsStated: { type: ['string', 'null'], description: 'The words of the request that state the coupon, copied exactly' },
+    couponRateBasis: { type: ['string', 'null'], enum: ['per-annum', 'per-period', null] },
+    couponBarrierPct: { ...num, description: '% of the initial level' },
+    memory: { type: ['boolean', 'null'] },
+    autocallLevelPct: { ...num, description: '% of the initial level' },
+    autocallFromPeriod: { type: ['integer', 'null'], description: 'First observation (1-based) that can autocall' },
+    knockInBarrierPct: { ...num, description: '% of the initial level' },
+    protectionPct: { ...num, description: 'Capital protection, % of face' },
+    participationPct: num,
+  },
+  required: ['productType', 'name', 'size', 'issuePricePct', 'underlyingSymbol', 'observationEveryMonths', 'observationCount', 'couponRatePct', 'couponAsStated', 'couponRateBasis', 'couponBarrierPct', 'memory', 'autocallLevelPct', 'autocallFromPeriod', 'knockInBarrierPct', 'protectionPct', 'participationPct'],
+};
+
+function system(today: string): string {
+  return `You extract structured-note term sheets into JSON for StratosNotes (notes issued on Solana, observed by Chainlink). Today is ${today}.
+Products: ${Object.entries(PRODUCT_LABELS).map(([k, v]) => `${k} = ${v}`).join('; ')}.
+Rules:
+- Use only terms the user states or that follow directly from them. Use null for anything not stated; never invent a level.
+- Coupon: give the rate as stated and say whether it is per annum or per observation period; the conversion is done for you.
+- Schedule: a 12-month note observed quarterly has 4 observations every 3 months.
+- Barrier and autocall levels are % of the initial (strike) level.
+- Name: short, e.g. "12M Phoenix on ETH".`;
+}
+
+const ANNUAL = /\bp\.?\s?a\b|per\s+annum|(?<!semi-?\s?)annual|a\s+year|per\s+year|yearly/i;
+export const SUPPORTED_UNDERLYINGS = Object.keys(FEEDS);
+
+function toParams(d: Draft, prompt: string, notes: string[]): { params: ProductParams; schedule: Schedule } {
+  const t = (d.productType ?? 'fcn') as ProductType;
+  const dflt = <T>(v: T | null | undefined, fallback: T, note: string): T => { if (v === null || v === undefined) { if (note) notes.push(note); return fallback; } return v; };
+  const every = dflt(d.observationEveryMonths, 3, 'Observation frequency not stated: quarterly assumed.');
+  const count = dflt(d.observationCount, t === 'ppn' ? 1 : 4, `Number of observations not stated: ${t === 'ppn' ? 1 : 4} assumed.`);
+  const sym = (d.underlyingSymbol ?? '').toUpperCase().replace(/[^A-Z]/g, '') as keyof typeof FEEDS;
+  const feed = FEEDS[sym] ?? FEEDS.ETH; // unsupported symbols are refused before this
+  const params: ProductParams = {
+    productType: t,
+    name: d.name || `${PRODUCT_LABELS[t]} on ${feed.symbol}`,
+    issuePricePct: dflt(d.issuePricePct, 100, 'Issue price not stated: par (100%) assumed.'),
+    underlying: feed,
+    observations: count,
+  };
+  const use = productUses(t);
+  // The coupon's rate and basis come from the words quoted from the request; annual rates are
+  // converted here (the model's own arithmetic was unreliable in Flow's evaluation).
+  const quoted = d.couponAsStated && prompt.includes(d.couponAsStated) ? d.couponAsStated : null;
+  const quotedRate = quoted?.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (quotedRate) { d.couponRatePct = Number(quotedRate[1]); d.couponRateBasis = ANNUAL.test(quoted!) ? 'per-annum' : 'per-period'; }
+  if (use.coupon && d.couponRatePct !== null) {
+    const perAnnum = d.couponRateBasis === 'per-annum' && ANNUAL.test(quoted ?? prompt);
+    params.couponRatePct = perAnnum ? Math.round(d.couponRatePct * every / 12 * 1e6) / 1e6 : d.couponRatePct;
+    if (perAnnum) notes.push(`Coupon ${d.couponRatePct}% p.a. paid every ${every} month${every === 1 ? '' : 's'}: ${params.couponRatePct}% per period.`);
+  }
+  if (use.couponBarrier && d.couponBarrierPct !== null) params.couponBarrierPct = d.couponBarrierPct;
+  if (t === 'phoenix') params.memory = dflt(d.memory, false, 'Memory not stated: no memory assumed.');
+  if (use.autocall && d.autocallLevelPct !== null) params.autocallLevelPct = d.autocallLevelPct;
+  if (use.autocall) params.autocallFromPeriod = dflt(d.autocallFromPeriod, 1, '');
+  if (use.knockIn && d.knockInBarrierPct !== null) params.knockInBarrierPct = d.knockInBarrierPct;
+  if (use.protection && d.protectionPct !== null) params.protectionPct = d.protectionPct;
+  if (use.protection && d.participationPct !== null) params.participationPct = d.participationPct;
+  return { params, schedule: { every, unit: 'months', count, ...(d.size ? { size: d.size } : {}) } };
+}
+
+export async function extractProduct(ai: AiRunner, prompt: string, product: ProductType, today: string, maxRepairs = 2): Promise<ExtractedProduct | { errors: string[] }> {
+  const messages: ChatMessage[] = [
+    { role: 'system', content: system(today) },
+    { role: 'user', content: `Product type (already identified): ${product}.\n\nRequest:\n${prompt}` },
+  ];
+  let errors: string[] = [];
+  for (let attempt = 0; attempt <= maxRepairs; attempt++) {
+    const draft = await ai.json<Draft>(messages, SCHEMA, 'term_sheet').catch(() => null);
+    if (!draft) { errors = ['The reply was not valid JSON.']; continue; }
+    draft.productType = draft.productType ?? product;
+    const bad = unsupportedUnderlying(draft.underlyingSymbol);
+    if (bad) return { errors: [`There is no Chainlink price feed for ${bad} set up here yet; notes can be issued on ${SUPPORTED_UNDERLYINGS.join(', ')}.`] };
+    const notes: string[] = [];
+    const { params, schedule } = toParams(draft, prompt, notes);
+    errors = validateProductParams(params);
+    if (!errors.length) return { params, schedule, notes };
+    messages.push({ role: 'assistant', content: JSON.stringify(draft) });
+    messages.push({ role: 'user', content: `Those terms are not consistent:\n- ${errors.join('\n- ')}\nCorrect only what the request supports; use null where the request does not state a value.` });
+  }
+  return { errors };
+}
+
+/** An underlying named in the request that has no Chainlink feed configured here, if any. */
+export function unsupportedUnderlying(symbol: string | null | undefined): string | null {
+  const s = (symbol ?? '').toUpperCase().replace(/[^A-Z]/g, '');
+  return s && !(s in FEEDS) ? s : null;
+}

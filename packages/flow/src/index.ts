@@ -8,3 +8,6 @@ export * from './products/params';
 export * from './products/payoff';
 export * from './products/instantiate';
 export * from './client/engine';
+export * from './validate';
+export * from './draft';
+export * from './defview';

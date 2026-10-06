@@ -6,9 +6,13 @@
  */
 import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { createMintToInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token';
+import { runAi } from '../packages/flow/src/ai/pipeline';
+import { workersAiRunner } from '../packages/flow/src/ai/runner';
+import type { WorkflowDraft } from '../packages/flow/src/draft';
 
 interface Env {
   ASSETS: { fetch: (r: Request) => Promise<Response> };
+  AI: { run(model: string, input: unknown): Promise<unknown> };
   FAUCET: KVNamespace;
   FAUCET_KEY: string; // JSON array secret key (devnet only)
   TEST_USDC: string;
@@ -42,11 +46,33 @@ async function faucet(req: Request, env: Env): Promise<Response> {
   return json({ transaction: btoa(String.fromCharCode(...tx.serialize())), amount: '2000' });
 }
 
+const AI_PER_HOUR = 60;
+
+/** The AI leg: term sheet -> note, edits to the open workflow, questions. Same-origin, rate-limited per IP. */
+async function ai(req: Request, env: Env): Promise<Response> {
+  const origin = req.headers.get('Origin');
+  if (origin && origin !== new URL(req.url).origin) return json({ error: 'Not allowed from this origin.' }, 403);
+  const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const bucket = `ai:${ip}:${Math.floor(Date.now() / 3_600_000)}`;
+  const used = Number(await env.FAUCET.get(bucket) ?? 0);
+  if (used >= AI_PER_HOUR) return json({ error: 'Too many AI requests this hour; try again later.' }, 429);
+  await env.FAUCET.put(bucket, String(used + 1), { expirationTtl: 7200 });
+  const body = await req.json().catch(() => null) as { prompt?: string; draft?: WorkflowDraft } | null;
+  const prompt = (body?.prompt ?? '').trim();
+  if (!prompt) return json({ error: 'Say what you want: a note from terms, a change to the workflow, or a question.' }, 400);
+  if (prompt.length > 4000) return json({ error: 'Keep the request under 4,000 characters.' }, 400);
+  const result = await runAi(workersAiRunner(env.AI), { prompt, today: new Date().toISOString().slice(0, 10), draft: body?.draft });
+  return json(result);
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     if (url.pathname === '/api/faucet' && req.method === 'POST') {
       try { return await faucet(req, env); } catch (e) { return json({ error: e instanceof Error ? e.message : String(e) }, 502); }
+    }
+    if (url.pathname === '/api/ai' && req.method === 'POST') {
+      try { return await ai(req, env); } catch (e) { return json({ kind: 'error', error: e instanceof Error ? e.message : String(e) }, 502); }
     }
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
     return env.ASSETS.fetch(req);

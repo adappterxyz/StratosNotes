@@ -563,6 +563,54 @@
       ]
     },
     {
+      "name": "transfer_units",
+      "docs": [
+        "A holder moves note units (an ISSUED asset) to another key, in whole or",
+        "in part. Later coupons and redemptions pay whoever holds the units then:",
+        "distributions read this ledger."
+      ],
+      "discriminator": [
+        65,
+        73,
+        198,
+        106,
+        237,
+        36,
+        61,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        },
+        {
+          "name": "signer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "asset",
+          "type": "u8"
+        },
+        {
+          "name": "to",
+          "type": "pubkey"
+        },
+        {
+          "name": "amount",
+          "type": "i128"
+        }
+      ]
+    },
+    {
       "name": "withdraw",
       "docs": [
         "Take your cash out of the process."
@@ -710,6 +758,19 @@
         144,
         91,
         157
+      ]
+    },
+    {
+      "name": "UnitsTransferred",
+      "discriminator": [
+        213,
+        73,
+        215,
+        135,
+        222,
+        229,
+        254,
+        145
       ]
     }
   ],
@@ -863,6 +924,11 @@
       "code": 6029,
       "name": "NotCash",
       "msg": "Asset is not cash (no SPL token behind it)"
+    },
+    {
+      "code": 6030,
+      "name": "NotTransferable",
+      "msg": "Only note units (issued assets) can be transferred; withdraw cash instead"
     }
   ],
   "types": [
@@ -1089,6 +1155,34 @@
           {
             "name": "kind",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnitsTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "process",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "i128"
           }
         ]
       }

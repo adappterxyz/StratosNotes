@@ -12,6 +12,36 @@ use anchor_lang::prelude::*;
 
 pub const DEF_VERSION: u8 = 1;
 
+/// A length-prefixed string or byte run the engine never uses (names, ids,
+/// metadata for people, apps and CRE): decoded by skipping, with no
+/// allocation. Solana gives a program 32 KiB of heap that is never freed, and
+/// the CRE report path cannot ask for more.
+/// One byte, not zero-sized: borsh refuses vectors of zero-sized types.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Skip(u8);
+
+impl AnchorDeserialize for Skip {
+    fn deserialize_reader<R: std::io::Read>(r: &mut R) -> std::io::Result<Self> {
+        let mut n = u32::deserialize_reader(r)? as usize;
+        let mut buf = [0u8; 64];
+        while n > 0 {
+            let k = n.min(buf.len());
+            r.read_exact(&mut buf[..k])?;
+            n -= k;
+        }
+        Ok(Skip(0))
+    }
+}
+
+impl AnchorSerialize for Skip {
+    fn serialize<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        0u32.serialize(w)
+    }
+}
+
+#[cfg(feature = "idl-build")]
+impl anchor_lang::IdlBuild for Skip {}
+
 /// Step kinds (BPMN element types).
 pub mod kind {
     pub const START: u8 = 0;
@@ -61,11 +91,12 @@ pub mod akind {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct WorkflowDef {
     pub version: u8,
-    pub name: String,
+    pub name: Skip,
     /// Free-form JSON for people and apps (e.g. a product's term sheet, so a
-    /// marketplace can show and price an offering from chain alone).
-    pub meta: String,
-    pub roles: Vec<String>,
+    /// marketplace can show and price an offering from chain alone). Skipped.
+    pub meta: Skip,
+    /// Role (pool) names: only their number matters to the engine.
+    pub roles: Vec<Skip>,
     pub fields: Vec<FieldDef>,
     pub assets: Vec<AssetDef>,
     /// Expression / predicate programs (RPN), referenced by index.
@@ -78,13 +109,13 @@ pub struct WorkflowDef {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct FieldDef {
-    pub name: String,
+    pub name: Skip,
     pub kind: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct AssetDef {
-    pub name: String,
+    pub name: Skip,
     pub kind: u8,
     /// CASH: the SPL token's decimals (the mint is chosen per process at start).
     pub decimals: u8,
@@ -148,7 +179,7 @@ pub const NO_EXPR: u16 = u16::MAX;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct StepDef {
-    pub id: String,
+    pub id: Skip,
     pub kind: u8,
     pub role: u8,
     pub timer: Option<Due>,

@@ -62,4 +62,6 @@ pub enum EngineError {
     ProcessFinished,
     #[msg("Asset is not cash (no SPL token behind it)")]
     NotCash,
+    #[msg("Only note units (issued assets) can be transferred; withdraw cash instead")]
+    NotTransferable,
 }

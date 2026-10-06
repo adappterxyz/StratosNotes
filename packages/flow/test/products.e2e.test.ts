@@ -28,12 +28,13 @@ async function funded() {
   return kp;
 }
 
-interface Run { type: ProductType; path: number[]; investors: number[] }
+/** transfer: after the strike, investor 0 moves `units` of their notes to a new holder. */
+interface Run { type: ProductType; path: number[]; investors: number[]; transfer?: number }
 const RUNS: Run[] = [
   { type: 'fcn', path: [90, 104, 0, 0], investors: [600, 400] }, // autocalled at 2
   { type: 'fcn', path: [90, 95, 80, 50], investors: [700, 300] }, // knocked in: cash-settled at 0.5
   { type: 'reverse-convertible', path: [95, 80, 75, 65], investors: [500, 500] },
-  { type: 'phoenix', path: [60, 65, 80, 75], investors: [250, 750] }, // memory catches up at 3
+  { type: 'phoenix', path: [60, 65, 80, 75], investors: [250, 750], transfer: 100 }, // memory catches up at 3; part of a position changes hands
   { type: 'snowball', path: [90, 95, 99, 101], investors: [900, 100] }, // called at maturity
   { type: 'ppn', path: [130], investors: [400, 600] },
 ];
@@ -119,6 +120,17 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
       // CRE's job: the strike on the strike date, then each observation on its date.
       await until(strikeAt);
       await report(process, definition, c.stepIndex.Task_FixStrike, [dec(STRIKE)]);
+      // Secondary transfer, in part: later coupons and the redemption follow the units.
+      if (run.transfer) {
+        const buyer = await funded();
+        await getOrCreateAssociatedTokenAccount(conn, admin, usdc, buyer.publicKey);
+        const seller = investors[0];
+        await expect(seller.e.send([await seller.e.transferUnits(process, definition, CASH, buyer.publicKey, dec(1))])).rejects.toThrow(/NotTransferable|transferred/);
+        await expect(seller.e.send([await seller.e.transferUnits(process, definition, 0, buyer.publicKey, dec(seller.units + 1))])).rejects.toThrow(/InsufficientBalance|Insufficient/);
+        await seller.e.send([await seller.e.transferUnits(process, definition, 0, buyer.publicKey, dec(run.transfer))]);
+        investors.push({ kp: buyer, e: new Engine(provider(buyer)), units: run.transfer });
+        seller.units -= run.transfer;
+      }
       for (let k = 1; k <= p.observations; k++) {
         if ((await issuer.process(process)).status !== 0) break; // autocalled
         await until(obsAt[k - 1]);

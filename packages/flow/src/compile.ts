@@ -187,7 +187,8 @@ export function compile(ir: WorkflowIR, meta: unknown = {}): Compiled {
     if (f.oracle) oracles[f.name] = { feed: f.oracle.feed, ...(f.oracle.feedChain ? { feedChain: f.oracle.feedChain } : {}), ...(f.oracle.staleness ? { staleness: f.oracle.staleness } : {}) };
   }
   const def: WorkflowDef = {
-    version: DEF_VERSION, name: ir.name, meta: JSON.stringify({ ...(meta as object), oracles }),
+    // Step names and pools, so any definition can be redrawn and labelled from chain alone.
+    version: DEF_VERSION, name: ir.name, meta: JSON.stringify({ ...(meta as object), oracles, names: Object.fromEntries(ir.nodes.map(n => [n.id, n.name])) }),
     roles: ir.pools.map(p => p.name), fields,
     assets: ir.assets.map(a => ({ name: a.name, kind: AKIND[a.kind], decimals: a.decimals ?? 0 })),
     exprs, steps,

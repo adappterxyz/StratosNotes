@@ -155,6 +155,11 @@ export class Engine {
     }).instruction();
   }
 
+  /** Move note units (an issued asset), in whole or in part; `amount` is fixed point (dec()). */
+  transferUnits(process: PublicKey, definition: PublicKey, asset: number, to: PublicKey, amount: bigint) {
+    return this.program.methods.transferUnits(asset, to, new BN(amount.toString())).accountsPartial({ process, definition, signer: this.wallet }).instruction();
+  }
+
   async definition(address: PublicKey) {
     const d = await this.program.account.definition.fetch(address) as { sealed: boolean; data: Buffer; hash: number[] };
     return { address, sealed: d.sealed, def: decodeDef(Uint8Array.from(d.data)) };
