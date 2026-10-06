@@ -106,7 +106,7 @@ table.t td.r, table.t th.r { text-align: right; }
 .tl.done .mark { background: var(--accent); border-color: var(--accent); }
 .tl.now .mark { border-color: var(--warn); background: var(--warn-soft); }
 
-.bpmn { height: 420px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; overflow: hidden; }
+.bpmn { height: 360px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; overflow: hidden; }
 .bpmn .djs-container svg { max-width: none; }
 .bpmn .active-step:not(.djs-connection) .djs-visual > :nth-child(1) { stroke: #0e8f66 !important; stroke-width: 3px !important; fill: #e2f4ec !important; }
 

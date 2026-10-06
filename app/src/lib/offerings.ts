@@ -18,7 +18,10 @@ export interface Offering {
   address: PublicKey;
   definition: PublicKey;
   def: WorkflowDef;
+  /** The term sheet when the workflow is (or started from) a stock product. */
   params: ProductParams;
+  /** Edited in the studio: the payoff is defined by the workflow, not a reference engine. */
+  custom: boolean;
   label: string;
   process: ProcessAccount;
   issuer: PublicKey;
@@ -44,10 +47,14 @@ function field(p: ProcessAccount, def: WorkflowDef, name: string) {
 }
 
 export function toOffering(p: ProcessAccount, def: WorkflowDef, now = Date.now() / 1000): Offering | null {
-  let meta: { product?: ProductParams } = {};
+  let meta: { product?: ProductParams; custom?: boolean } = {};
   try { meta = JSON.parse(def.meta); } catch { return null; }
-  const params = meta.product;
-  if (!params) return null;
+  const custom = !!meta.custom || !meta.product;
+  // A workflow with no term sheet still lists; its card and page describe the workflow instead.
+  const params: ProductParams = meta.product ?? {
+    productType: 'fcn', name: def.name || 'Custom workflow', issuePricePct: 100,
+    underlying: { symbol: '—', feed: '', feedChain: '', minPrice: 0, maxPrice: 0 }, observations: def.fields.filter(f => /^obsDate\d+$/.test(f.name)).length,
+  };
   const stepIndex = Object.fromEntries(def.steps.map((s, i) => [s.id, i]));
   const notional = num(field(p, def, 'notional'));
   const strikeDate = Number(field(p, def, 'strikeDate') ?? 0);
@@ -65,19 +72,20 @@ export function toOffering(p: ProcessAccount, def: WorkflowDef, now = Date.now()
   const issued = notional > 0 && p.holdings.some(h => h.asset === NOTE);
   const sold = issued ? notional - issuerNotes : 0;
   const activeSteps = [...new Set(p.tokens.map(t => def.steps[t]?.id).filter(Boolean))] as string[];
+  const windowOpen = def.steps.some((s, i) => s.until && p.tokens.includes(i));
   const phase: Phase = p.status === 1 ? 'redeemed'
-    : activeSteps.includes('Task_Subscribe') && now < strikeDate ? 'book'
+    : windowOpen && (strikeDate ? now < strikeDate : true) ? 'book'
     : strike === null ? 'fixing' : 'live';
 
   let outcome: Offering['outcome'] = null;
-  if (strike !== null && observed.length) {
+  if (!custom && strike !== null && observed.length) {
     const path = [...observed, ...new Array(params.observations - observed.length).fill(observed[observed.length - 1])];
     const r = simulatePayoff(params, strike, path);
     const finished = p.status === 1;
     outcome = { calledAt: r.calledAt && r.calledAt <= observed.length ? r.calledAt : undefined, finished, perUnit: totalPerUnit(r) };
   }
   return {
-    address: p.address, definition: p.definition, def, params, label: PRODUCT_LABELS[params.productType], process: p,
+    address: p.address, definition: p.definition, def, params, custom, label: meta.product ? (custom ? `Custom ${PRODUCT_LABELS[params.productType]}` : PRODUCT_LABELS[params.productType]) : 'Custom workflow', process: p,
     issuer, isin: String(field(p, def, 'isin') ?? ''), notional: Number.isFinite(notional) ? notional : 0, sold,
     strikeDate, obsDates, strike, observed, phase, activeSteps, stepIndex, outcome,
   };

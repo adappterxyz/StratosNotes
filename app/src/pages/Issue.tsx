@@ -28,10 +28,28 @@ export default function Issue() {
   const nav = useNavigate();
   const { engine, connected } = useEngine();
   const { publicKey } = useWallet();
-  const [p, setP] = useState<ProductParams>(EXAMPLE_PRODUCTS.fcn);
-  const [size, setSize] = useState(10_000);
-  const [strikeAt, setStrikeAt] = useState(() => Math.floor(Date.now() / 1000) + 15 * 60);
-  const [every, setEvery] = useState({ n: 10, unit: 'minutes' as 'minutes' | 'days' | 'months' });
+  // Terms handed over by the AI or the studio, if any.
+  const handed = (() => { try { return JSON.parse(sessionStorage.getItem('sn-ai-product') ?? 'null') as { params: ProductParams; schedule?: { every: number; unit: 'months' | 'days' | 'minutes'; count: number; size?: number } } | null; } catch { return null; } })();
+  const [p, setP] = useState<ProductParams>(handed?.params ?? EXAMPLE_PRODUCTS.fcn);
+  const [size, setSize] = useState(handed?.schedule?.size ?? 10_000);
+  const [strikeAt, setStrikeAt] = useState(() => Math.floor(Date.now() / 1000) + 5 * 60);
+  // Minutes by default so a whole lifecycle can be shown live; the AI's schedule (months) is offered too.
+  const [every, setEvery] = useState({ n: 3, unit: 'minutes' as 'minutes' | 'days' | 'months' });
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiReply, setAiReply] = useState<{ text: string; notes?: string[]; bad?: boolean } | null>(null);
+  const askAi = async () => {
+    setBusy(true); setAiReply(null);
+    try {
+      const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: aiPrompt }) });
+      const j = await r.json() as { kind?: string; params?: ProductParams; schedule?: { every: number; count: number; size?: number }; notes?: string[]; reply?: string; error?: string };
+      if (j.kind === 'product' && j.params) {
+        setP(j.params);
+        if (j.schedule?.size) setSize(j.schedule.size);
+        setAiReply({ text: `Filled in: ${j.params.name}. The term sheet observes every ${j.schedule?.every} months; for a live demo keep minutes below.`, notes: j.notes });
+      } else setAiReply({ text: j.reply ?? j.error ?? 'No answer.', bad: j.kind === 'error' });
+    } catch (e) { setAiReply({ text: e instanceof Error ? e.message : String(e), bad: true }); }
+    finally { setBusy(false); }
+  };
   const [isin, setIsin] = useState('XS' + String(Date.now()).slice(-10));
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -87,8 +105,16 @@ export default function Issue() {
       <div className="stack" style={{ gap: 8 }}>
         <span className="label">Self-service issuance</span>
         <h1>Issue a structured note</h1>
-        <p className="muted" style={{ margin: 0, maxWidth: '64ch' }}>Pick a payoff, set this issuance's size and dates, and deposit the coupon reserve. The note opens for subscription at once; Chainlink CRE fixes the strike on the strike date and observes on every date after.</p>
+        <p className="muted" style={{ margin: 0, maxWidth: '64ch' }}>Pick a payoff, set this issuance's size and dates, and deposit the coupon reserve. The note opens for subscription at once; Chainlink CRE fixes the strike on the strike date and observes on every date after. Dates can be minutes apart, so a whole lifecycle runs on-chain while you watch.</p>
       </div>
+      <section className="card stack" style={{ gap: 10 }}>
+        <div className="row" style={{ flexWrap: 'nowrap' }}>
+          <input aria-label="Describe the note" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && aiPrompt.trim()) askAi(); }} style={{ flex: 1, font: '500 14px var(--font)', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--line-2)', background: 'var(--paper)', color: 'var(--ink)' }}
+            placeholder='Paste or describe a term sheet: "12M snowball on BTC, 9% p.a. quarterly, autocall 100%, KI 65%, 25k USDC"' />
+          <button className="btn" disabled={busy || !aiPrompt.trim()} onClick={askAi}>Fill with AI</button>
+        </div>
+        {aiReply && <div className={`notice ${aiReply.bad ? 'err' : 'info'}`}>{aiReply.text}{aiReply.notes?.length ? <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{aiReply.notes.map(n => <li key={n}>{n}</li>)}</ul> : null}</div>}
+      </section>
       <div className="two">
         <div className="stack">
           <section className="card">

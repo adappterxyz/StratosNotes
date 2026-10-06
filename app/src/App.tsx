@@ -4,6 +4,7 @@ import Marketplace from './pages/Marketplace';
 import OfferingPage from './pages/Offering';
 import Issue from './pages/Issue';
 import Portfolio from './pages/Portfolio';
+import Studio from './pages/Studio';
 import FaucetButton from './components/FaucetButton';
 import { DEPLOYMENT, explorer } from './config';
 
@@ -19,6 +20,7 @@ export default function App() {
           <nav className="nav">
             <NavLink to="/" end>Marketplace</NavLink>
             <NavLink to="/issue">Issue a note</NavLink>
+            <NavLink to="/studio">Studio</NavLink>
             <NavLink to="/portfolio">Portfolio</NavLink>
           </nav>
           <span className="pill net"><span className="dot" style={{ color: 'var(--accent)' }} />Solana devnet</span>
@@ -32,6 +34,7 @@ export default function App() {
           <Route path="/note/:address" element={<OfferingPage />} />
           <Route path="/issue" element={<Issue />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/studio" element={<Studio />} />
         </Routes>
         <footer className="foot">
           <span>Notes run as BPMN workflows on the StratosNotes engine; strikes and observations arrive as Chainlink CRE reports.</span>

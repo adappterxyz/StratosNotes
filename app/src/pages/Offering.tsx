@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { dec, instantiateProduct, slot, toBase } from '@stratosnotes/flow';
+import { dec, defToBpmn, instantiateProduct, slot, slotValue, SCALE, toBase } from '@stratosnotes/flow';
+import TasksPanel from '../components/TasksPanel';
 import BpmnView from '../components/BpmnView';
 import PayoffChart from '../components/PayoffChart';
 import { headline, PHASE_LABEL } from '../components/OfferingCard';
@@ -18,9 +19,11 @@ export default function OfferingPage() {
   const { publicKey } = useWallet();
   const o = offerings?.find(x => x.address.toBase58() === address);
   const [units, setUnits] = useState('100');
+  const [xfer, setXfer] = useState({ to: '', units: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string; sig?: string } | null>(null);
-  const xml = useMemo(() => (o ? instantiateProduct(o.params).bpmnXml : ''), [o?.params]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Stock products redraw from their term sheet; custom workflows from the on-chain definition.
+  const xml = useMemo(() => (!o ? '' : o.custom ? defToBpmn(o.def) : instantiateProduct(o.params).bpmnXml), [o?.address.toBase58(), o?.custom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!offerings) return <p className="muted" style={{ paddingTop: 32 }}>Reading the note from Solana…</p>;
   if (!o) return <div className="empty" style={{ marginTop: 32 }}><strong>No note at this address.</strong><Link to="/">Back to the marketplace</Link></div>;
@@ -36,6 +39,11 @@ export default function OfferingPage() {
   };
   const subscribe = () => run(`Subscribed ${units} units for ${fmtMoney(cost)} USDC.`, async () =>
     engine.send([await engine.executeStep(o.address, o.definition, o.stepIndex.Task_Subscribe, [slot.number(dec(units))], { deposit: { asset: CASH, mint: o.process.mints[CASH] } })]));
+  const transfer = () => run(`Transferred ${xfer.units} units.`, async () => {
+    let to: PublicKey;
+    try { to = new PublicKey(xfer.to.trim()); } catch { throw new Error('Enter the recipient wallet address.'); }
+    return engine.send([await engine.transferUnits(o.address, o.definition, 0, to, dec(xfer.units))]);
+  });
   const withdraw = () => run('Withdrawn to your wallet.', async () =>
     engine.send([await engine.withdraw(o.address, o.definition, CASH, o.process.mints[CASH], toBase(mine!.cashRaw, 6))]));
 
@@ -46,6 +54,7 @@ export default function OfferingPage() {
       when: t,
       value: o.observed[k] !== undefined ? `${fmtPrice(o.observed[k])} (${((o.observed[k] / o.strike!) * 100).toFixed(1)}%)` : undefined,
       state: (o.observed[k] !== undefined ? 'done' : o.phase === 'live' && k === o.observed.length ? 'now' : 'later') as 'done' | 'now' | 'later',
+      ...(o.phase === 'redeemed' && o.observed[k] === undefined ? { value: o.outcome?.calledAt ? `not needed: called at ${o.outcome.calledAt}` : 'not observed' } : {}),
     })),
   ];
 
@@ -90,7 +99,7 @@ export default function OfferingPage() {
         </div>
 
         <aside className="stack">
-          {o.phase === 'book' && (
+          {o.phase === 'book' && !o.custom && o.stepIndex.Task_Subscribe !== undefined && (
             <section className="card">
               <h3>Subscribe</h3>
               <p className="small muted" style={{ margin: 0 }}>Open until {fmtDate(o.strikeDate)}. {fmtMoney(remaining, 0)} units left. One unit = 1 USDC of face.</p>
@@ -105,6 +114,8 @@ export default function OfferingPage() {
             </section>
           )}
 
+          <TasksPanel o={o} onDone={refresh} hide={o.custom ? [] : ['Task_Subscribe']} />
+
           {mine && (mine.units > 0 || mine.cash > 0) && (
             <section className="card">
               <h3>Your position</h3>
@@ -113,16 +124,38 @@ export default function OfferingPage() {
                 <div><span className="label">Cash to withdraw</span><span className="v">{fmtMoney(mine.cash)}</span></div>
               </div>
               <button className="btn" disabled={busy || !(mine.cash > 0)} onClick={withdraw}>Withdraw USDC</button>
+              {mine.units > 0 && o.phase !== 'redeemed' && (
+                <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                  <span className="label">Transfer notes</span>
+                  <div className="field"><label htmlFor="x-to">To wallet</label><input id="x-to" className="num" value={xfer.to} onChange={e => setXfer({ ...xfer, to: e.target.value })} placeholder="Solana address" /></div>
+                  <div className="field"><label htmlFor="x-units">Units (up to {fmtMoney(mine.units)})</label><input id="x-units" inputMode="decimal" value={xfer.units} onChange={e => setXfer({ ...xfer, units: e.target.value })} /></div>
+                  <button className="btn ghost" disabled={busy || !(Number(xfer.units) > 0) || Number(xfer.units) > mine.units} onClick={transfer}>Transfer</button>
+                  <span className="small muted">In whole or in part. Coupons and the redemption from now on go to whoever holds the units.</span>
+                </div>
+              )}
             </section>
           )}
 
           {msg && <div className={`notice ${msg.kind}`} role="status">{msg.text} {msg.sig && <a href={explorer('tx', msg.sig)} target="_blank" rel="noreferrer">View transaction</a>}</div>}
 
-          <section className="card">
+          {o.custom && (
+            <section className="card">
+              <h3>Workflow fields</h3>
+              <table className="t"><tbody>
+                {o.def.fields.map((f, i) => {
+                  const v = slotValue(o.process.values[i], f.kind);
+                  const shown = v === null ? '—' : typeof v === 'bigint' ? (f.kind === 0 ? (Number(v) / Number(SCALE)).toLocaleString() : f.kind === 2 ? new Date(Number(v) * 1000).toLocaleString() : v.toString()) : String(v);
+                  return <tr key={f.name}><td>{f.name}</td><td className="r num">{shown}</td></tr>;
+                })}
+              </tbody></table>
+            </section>
+          )}
+
+          {!o.custom && <section className="card">
             <h3>Payout per 100 at maturity</h3>
             <PayoffChart params={o.params} />
             <p className="small muted" style={{ margin: 0 }}>Against the final level, % of strike, if not called earlier. Dashed lines: barriers.</p>
-          </section>
+          </section>}
 
           <section className="card small">
             <div className="spread"><span className="muted">Issuance</span><a className="num" href={explorer('address', o.address.toBase58())} target="_blank" rel="noreferrer">{o.address.toBase58().slice(0, 8)}…</a></div>

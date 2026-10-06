@@ -86,7 +86,10 @@ export default function PropertiesPanel({ modeler, element, fieldNames, dateFiel
                 <select aria-label="Where the value comes from" value={src} onChange={e => {
                   const v = e.target.value;
                   const { formula: _f, oracle: _o, ...base } = f;
-                  upd({ ...base, formula: undefined, oracle: undefined, ...(v === 'formula' ? { formula: '0' } : v === 'oracle' ? { oracle: { feed: FEEDS.ETH.feed, feedChain: FEEDS.ETH.feedChain, min: String(FEEDS.ETH.minPrice), max: String(FEEDS.ETH.maxPrice), staleness: 3600 } } : {}) });
+                  const next: TemplateField = v === 'formula' ? { ...base, formula: '0' }
+                    : v === 'oracle' ? { ...base, type: 'Decimal', oracle: { feed: FEEDS.ETH.feed, feedChain: FEEDS.ETH.feedChain, min: String(FEEDS.ETH.minPrice), max: String(FEEDS.ETH.maxPrice), staleness: 3600 } }
+                    : base;
+                  setFields(fields.map((x, j) => j === i ? next : x));
                 }}>
                   <option value="input">Entered by the person running the step</option>
                   <option value="formula">Computed by a formula</option>
