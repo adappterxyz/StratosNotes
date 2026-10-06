@@ -6,6 +6,9 @@ resolver = "2"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+# Size over speed: the engine fits CRE's 300k compute cap with room to spare,
+# and program rent (and every upgrade buffer) is paid per byte.
+opt-level = 3
 
 [profile.release.build-override]
 opt-level = 3

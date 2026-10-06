@@ -7,7 +7,8 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { AnchorProvider, Program, Wallet } from '@coral-xyz/anchor';
-import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
+import { ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
+const CU: number[] = [];
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import {
   compile, dec, encodeReport, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
@@ -57,13 +58,16 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
   async function report(process: PublicKey, definition: PublicKey, step: number, values: bigint[]) {
     const mock = new Program(MOCK_FORWARDER_IDL, provider(admin));
     const [authority] = PublicKey.findProgramAddressSync([new TextEncoder().encode('forwarder'), forwarderState.publicKey.toBytes(), ENGINE_PROGRAM_ID.toBytes()], MOCK_ID);
-    await mock.methods.forward(Buffer.alloc(0), Buffer.from(encodeReport(process.toBytes(), step, values)))
+    const sig = await mock.methods.forward(Buffer.alloc(0), Buffer.from(encodeReport(process.toBytes(), step, values)))
       .accounts({ state: forwarderState.publicKey, authority, receiver: ENGINE_PROGRAM_ID })
       .remainingAccounts([
         { pubkey: pda.config(), isSigner: false, isWritable: false },
         { pubkey: process, isSigner: false, isWritable: true },
         { pubkey: definition, isSigner: false, isWritable: false },
-      ]).rpc();
+      ]).preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 })]).rpc();
+    // CRE caps a Solana write at 300k compute units: record what each report costs.
+    const tx = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
+    CU.push(tx?.meta?.computeUnitsConsumed ?? 0);
   }
 
   it('issues, subscribes, observes and pays every product to its reference payoff', async () => {
@@ -150,6 +154,8 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
       return { run, final, ref, paid };
     }));
 
+    console.log(`report compute units: max ${Math.max(...CU)}, mean ${Math.round(CU.reduce((a, b) => a + b, 0) / CU.length)} over ${CU.length} reports`);
+    expect(Math.max(...CU)).toBeLessThan(300_000); // CRE's cap for a Solana write
     for (const { run, final, ref, paid } of results) {
       expect(final.status, `${run.type} ${run.path} completed`).toBe(1);
       for (const x of paid) {
