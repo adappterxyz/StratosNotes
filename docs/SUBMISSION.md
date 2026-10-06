@@ -6,6 +6,7 @@ a sentence to the AI, or a BPMN editor), sell it to anyone for USDC, and let
 Chainlink CRE act as the calculation agent: it fixes the strike, observes the
 underlying on every date and triggers every coupon, autocall and redemption.
 
+- Site: https://sp.stratoslab.app
 - App: https://stratosnotes.uranusim.workers.dev (Solana devnet, test USDC faucet built in)
 - Code: https://github.com/adappterxyz/StratosNotes
 - Demo script: [DEMO.md](DEMO.md)

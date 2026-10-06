@@ -13,7 +13,7 @@ the strike from a Chainlink price feed on the strike date, observes on every
 date, and each observation runs the payoff on-chain: coupons, autocall,
 knock-in, redemption. Investors withdraw what they are paid.
 
-Submission: [docs/SUBMISSION.md](docs/SUBMISSION.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
+Site: https://sp.stratoslab.app · App: https://stratosnotes.uranusim.workers.dev · Submission: [docs/SUBMISSION.md](docs/SUBMISSION.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
 
 ## How it works
 
@@ -87,7 +87,8 @@ diagrams exported from Flow import unchanged.
 | `solana/programs/mock_forwarder` | Local stand-in for the keystone forwarder (same CPI shape), for tests |
 | `packages/flow` | BPMN parser/builder, expression language, compiler + Borsh codec, products and reference payoff, keeper logic, client |
 | `cre/notes-keeper` | The Chainlink CRE workflow |
-| `app` | Marketplace, offering pages, self-service issuance, portfolio (React + Solana wallet adapter) |
+| `app` | Marketplace, offering pages, self-service issuance, studio, portfolio (React + Solana wallet adapter) |
+| `landing` | The landing page at sp.stratoslab.app (`npm run deploy` there) |
 | `scripts/e2e.sh` | Every product end to end on a local validator |
 
 ## Run it
