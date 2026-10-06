@@ -2,7 +2,8 @@
  * Client for the flow_engine program: addresses, instructions, accounts.
  * Works in Node (tests, scripts) and the browser (marketplace app).
  */
-import { AnchorProvider, BN, Program, type Idl } from '@coral-xyz/anchor';
+import { AnchorProvider, Program, type Idl } from '@coral-xyz/anchor';
+import BN from 'bn.js';
 import { PublicKey, SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import idlJson from '../../idl/flow_engine.json';

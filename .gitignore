@@ -8,3 +8,6 @@ solana/target/
 test-ledger/
 .wrangler/
 cre/**/node_modules/
+# Demo wallets created by scripts (devnet only); never commit keys.
+.demo-keys/
+.cre_build_tmp.js

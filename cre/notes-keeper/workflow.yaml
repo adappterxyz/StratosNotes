@@ -1,0 +1,24 @@
+simulation-settings:
+  user-workflow:
+    workflow-name: "stratosnotes-keeper"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.simulation.json"
+    secrets-path: ""
+
+staging-settings:
+  user-workflow:
+    workflow-name: "stratosnotes-keeper"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+
+production-settings:
+  user-workflow:
+    workflow-name: "stratosnotes-keeper"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""

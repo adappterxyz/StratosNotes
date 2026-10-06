@@ -1,0 +1,28 @@
+{
+  "testUsdc": "ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6",
+  "engine": "9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx",
+  "config": "CVpuv1Mu3JEpWM4aUD7VbCqfrzGobG3oLmpdUFWX4Zm",
+  "forwarders": [
+    "7kuEAA3mSC1Tz8gQjnvH7bKFda9xSPRRin9SZbH49cNK",
+    "CXsKEJcs25TQEYU2e5jZ8QTPE3ffMLZhH6BWHrdcCCB5"
+  ],
+  "issues": [
+    {
+      "type": "fcn",
+      "name": "12M Fixed Coupon Note on ETH",
+      "process": "2eWVSt8MRqR8wMBu3ZWiWmj85YUdwzoACyyQWgT3Gu5B",
+      "definition": "3jruywfPXudtmxeBfp9ig72vgKYHoZqSFUaWrQDR6ATj",
+      "strikeAt": 1791264177,
+      "observations": [
+        1791264297,
+        1791264417,
+        1791264537,
+        1791264657
+      ],
+      "investors": [
+        600,
+        400
+      ]
+    }
+  ]
+}

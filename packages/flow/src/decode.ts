@@ -3,7 +3,7 @@
  * data): the marketplace renders offerings from it, and the CRE workflow uses
  * it to find the oracle steps that are due.
  */
-import type { WorkflowDef, StepDef, Due } from './compile';
+import type { WorkflowDef, StepDef, Due } from './def-types';
 
 class R {
   private o = 0;

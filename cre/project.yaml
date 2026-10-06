@@ -1,0 +1,21 @@
+# CRE project settings (cre workflow simulate|deploy --target <name>).
+simulation-settings:
+  rpcs:
+    - chain-name: solana-devnet
+      url: https://api.devnet.solana.com
+    - chain-name: ethereum-mainnet
+      url: https://ethereum.publicnode.com/
+
+staging-settings:
+  rpcs:
+    - chain-name: solana-devnet
+      url: https://api.devnet.solana.com
+    - chain-name: ethereum-mainnet
+      url: https://ethereum.publicnode.com/
+
+production-settings:
+  rpcs:
+    - chain-name: solana-mainnet
+      url: https://api.mainnet-beta.solana.com
+    - chain-name: ethereum-mainnet
+      url: https://ethereum.publicnode.com/

@@ -142,8 +142,8 @@ export function parsePred(src: string): Parsed<PredAst> {
   return ast ? { ok: true, ast, refs: [...refs].sort() } : { ok: false, error: 'empty condition', pos: 0 };
 }
 
-/** One engine RPN instruction (programs/flow_engine/src/def.rs `Op`). */
-export interface Op { code: number; field: number; value: bigint }
+export type { Op } from './op';
+import type { Op } from './op';
 
 const BIN: Record<string, number> = { '+': 2, '-': 3, '*': 4, '/': 5 };
 const CMPC: Record<string, number> = { '<': 7, '<=': 8, '>': 9, '>=': 10, '==': 11, '!=': 12 };

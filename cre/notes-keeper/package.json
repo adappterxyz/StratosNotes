@@ -1,0 +1,12 @@
+{
+  "name": "stratosnotes-keeper",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@chainlink/cre-sdk": "1.23.0",
+    "@solana/web3.js": "1.98.4",
+    "zod": "3.25.76"
+  },
+  "devDependencies": { "typescript": "5.9.3" }
+}

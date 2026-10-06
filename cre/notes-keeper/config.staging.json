@@ -1,0 +1,13 @@
+{
+  "schedule": "0 * * * * *",
+  "solana": {
+    "chainSelectorName": "solana-devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "engineProgramId": "9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx",
+    "forwarderState": "8QoomCQyPSkJ8WopJbX9B4HyvrFzziwvJdU8hZE6DCr9",
+    "forwarderProgramId": "CXsKEJcs25TQEYU2e5jZ8QTPE3ffMLZhH6BWHrdcCCB5",
+    "computeLimit": 300000
+  },
+  "maxReportsPerRun": 3,
+  "finalityAllowanceSec": 1800
+}

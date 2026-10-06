@@ -19,21 +19,8 @@ export const OP = { NONE: 0, MINT: 1, BURN: 2, TRANSFER: 3, SWAP: 4, DEPOSIT: 5,
 export const AKIND = { issued: 0, cash: 1 } as const;
 export const CARRIED = '__carried__';
 
-export interface Due { kind: number; at: bigint; field: number }
-export interface Capture { field: number; source: number; expr: number; min: bigint; max: bigint }
-export interface AssetOpDef { kind: number; asset: number; fromRole: number; toRole: number; amount: number; asset2: number; fromRole2: number; toRole2: number; amount2: number; retire: boolean }
-export interface Edge { target: number; cond: number; isDefault: boolean }
-export interface StepDef {
-  id: string; kind: number; role: number; timer: Due | null; guard: number; captures: Capture[];
-  ops: AssetOpDef[]; until: Due | null; next: Edge[]; sends: number[]; join: number;
-}
-export interface WorkflowDef {
-  version: number; name: string; meta: string; roles: string[];
-  fields: Array<{ name: string; kind: number }>;
-  assets: Array<{ name: string; kind: number; decimals: number }>;
-  exprs: Op[][];
-  steps: StepDef[];
-}
+export type { Due, Capture, AssetOpDef, Edge, StepDef, WorkflowDef } from './def-types';
+import type { Due, Capture, AssetOpDef, StepDef, WorkflowDef } from './def-types';
 
 export interface Compiled {
   def: WorkflowDef;
@@ -194,8 +181,13 @@ export function compile(ir: WorkflowIR, meta: unknown = {}): Compiled {
   });
 
   if (issues.length) throw new CompileError(issues);
+  // Which price feed backs each oracle field: the CRE workflow reads it here.
+  const oracles: Record<string, { feed: string; feedChain?: string; staleness?: number }> = {};
+  for (const n of ir.nodes) for (const f of n.props.templateFields ?? []) {
+    if (f.oracle) oracles[f.name] = { feed: f.oracle.feed, ...(f.oracle.feedChain ? { feedChain: f.oracle.feedChain } : {}), ...(f.oracle.staleness ? { staleness: f.oracle.staleness } : {}) };
+  }
   const def: WorkflowDef = {
-    version: DEF_VERSION, name: ir.name, meta: JSON.stringify(meta),
+    version: DEF_VERSION, name: ir.name, meta: JSON.stringify({ ...(meta as object), oracles }),
     roles: ir.pools.map(p => p.name), fields,
     assets: ir.assets.map(a => ({ name: a.name, kind: AKIND[a.kind], decimals: a.decimals ?? 0 })),
     exprs, steps,

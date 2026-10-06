@@ -1,0 +1,33 @@
+{
+  "name": "@stratosnotes/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5190",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.31.1",
+    "@solana/spl-token": "0.4.13",
+    "@solana/wallet-adapter-base": "0.9.27",
+    "@solana/wallet-adapter-react": "0.15.39",
+    "@solana/wallet-adapter-react-ui": "0.9.39",
+    "@solana/web3.js": "1.99.0",
+    "@stratosnotes/flow": "0.1.0",
+    "bn.js": "5.2.2",
+    "bpmn-js": "18.6.2",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "react-router-dom": "6.30.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "@vitejs/plugin-react": "4.7.0",
+    "typescript": "5.9.3",
+    "vite": "6.3.6",
+    "vite-plugin-node-polyfills": "0.24.0"
+  }
+}

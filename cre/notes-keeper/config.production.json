@@ -1,0 +1,13 @@
+{
+  "schedule": "0 * * * * *",
+  "solana": {
+    "chainSelectorName": "solana-mainnet",
+    "rpcUrl": "https://api.mainnet-beta.solana.com",
+    "engineProgramId": "<engine program id>",
+    "forwarderState": "<mainnet forwarder state>",
+    "forwarderProgramId": "<mainnet forwarder program>",
+    "computeLimit": 300000
+  },
+  "maxReportsPerRun": 3,
+  "finalityAllowanceSec": 1800
+}
