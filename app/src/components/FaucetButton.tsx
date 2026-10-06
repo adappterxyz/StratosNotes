@@ -20,9 +20,15 @@ export default function FaucetButton() {
         await connection.confirmTransaction(sig, 'confirmed');
       }
       setState({ busy: true, text: 'Minting 2,000 test USDC…' });
-      const r = await fetch('/api/faucet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ owner: publicKey.toBase58() }) });
-      const j = await r.json() as { error?: string };
-      setState(r.ok ? { busy: false, text: '2,000 test USDC on the way.' } : { busy: false, text: j.error ?? `Faucet error ${r.status}`, bad: true });
+      // The faucet signs the mint; this app submits it (devnet RPCs refuse Workers).
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      const r = await fetch('/api/faucet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ owner: publicKey.toBase58(), blockhash }) });
+      const j = await r.json() as { error?: string; transaction?: string };
+      if (!r.ok || !j.transaction) { setState({ busy: false, text: j.error ?? `Faucet error ${r.status}`, bad: true }); return; }
+      const raw = Uint8Array.from(atob(j.transaction), c => c.charCodeAt(0));
+      const sig = await connection.sendRawTransaction(raw);
+      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
+      setState({ busy: false, text: '2,000 test USDC received.' });
     } catch (e) {
       setState({ busy: false, text: e instanceof Error ? e.message : String(e), bad: true });
     }

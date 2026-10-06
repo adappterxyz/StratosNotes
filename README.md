@@ -70,7 +70,8 @@ diagrams exported from Flow import unchanged.
 |---|---|
 | Engine program | `9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx` |
 | Engine config (accepted forwarders) | `CVpuv1Mu3JEpWM4aUD7VbCqfrzGobG3oLmpdUFWX4Zm` |
-| Test USDC mint (6 decimals) | `ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6` |
+| Test USDC mint (6 decimals) | `ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6` (faucet in the app) |
+| App | https://stratosnotes.uranusim.workers.dev |
 | Chainlink forwarders accepted | `7kuEAA3m…` (CRE simulator), `CXsKEJcs…` (staging DON) |
 
 ## Repository
