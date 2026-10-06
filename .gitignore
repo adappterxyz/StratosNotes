@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+# Build output and program keypairs: never commit keypairs to this public repo.
+solana/target/
+.anchor/
+test-ledger/
+.wrangler/
+cre/**/node_modules/

@@ -1,0 +1,102 @@
+{
+  "address": "E5yD9T1GUpnrkWqiDgmqQVq621Ydc4LSnhrcnYwTuNoX",
+  "metadata": {
+    "name": "mock_forwarder",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Test stand-in for Chainlink's keystone forwarder: CPIs on_report signed by the forwarder-authority PDA"
+  },
+  "instructions": [
+    {
+      "name": "forward",
+      "docs": [
+        "Deliver `report` to `receiver`'s on_report; remaining accounts are the receiver's."
+      ],
+      "discriminator": [
+        45,
+        165,
+        201,
+        116,
+        206,
+        225,
+        241,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "state"
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "receiver"
+        }
+      ],
+      "args": [
+        {
+          "name": "metadata",
+          "type": "bytes"
+        },
+        {
+          "name": "report",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "init_state",
+      "discriminator": [
+        124,
+        213,
+        73,
+        136,
+        80,
+        37,
+        141,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ForwarderState",
+      "discriminator": [
+        211,
+        150,
+        18,
+        11,
+        12,
+        158,
+        235,
+        175
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "ForwarderState",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}

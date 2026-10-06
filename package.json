@@ -1,0 +1,13 @@
+{
+  "name": "stratosnotes",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Structured products as BPMN workflows on Solana, driven by Chainlink CRE",
+  "type": "module",
+  "workspaces": ["packages/*", "app"],
+  "scripts": {
+    "build:programs": "cd solana && anchor build && cp target/idl/*.json ../packages/flow/idl/",
+    "test": "npm -w packages/flow run test",
+    "e2e": "bash scripts/e2e.sh"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@stratosnotes/flow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.31.1",
+    "@noble/hashes": "^1.8.0",
+    "@solana/spl-token": "0.4.13",
+    "@solana/web3.js": "1.98.4",
+    "@xmldom/xmldom": "0.9.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,21 @@
+[package]
+name = "mock-forwarder"
+version = "0.1.0"
+description = "Test stand-in for Chainlink's keystone forwarder: CPIs on_report signed by the forwarder-authority PDA"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mock_forwarder"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"

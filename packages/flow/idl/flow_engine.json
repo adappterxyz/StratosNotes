@@ -1,0 +1,1097 @@
+{
+  "address": "9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx",
+  "metadata": {
+    "name": "flow_engine",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "StratosNotes workflow engine: runs compiled BPMN workflows (structured products) on Solana, driven by Chainlink CRE"
+  },
+  "instructions": [
+    {
+      "name": "create_definition",
+      "docs": [
+        "Start storing a compiled workflow of `len` bytes whose SHA-256 is `hash`."
+      ],
+      "discriminator": [
+        191,
+        74,
+        191,
+        142,
+        21,
+        53,
+        135,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "definition",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  102
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "len",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Put cash into the process on your own account (e.g. an issuer topping up coupons)."
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        },
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "from_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "asset",
+          "type": "u8"
+        },
+        {
+          "name": "base",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "execute_step",
+      "docs": [
+        "A role-holder runs a step: a user task, a decision, or a stuck service step."
+      ],
+      "discriminator": [
+        65,
+        194,
+        18,
+        72,
+        170,
+        82,
+        176,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        },
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "Only for steps that take a cash deposit."
+          ],
+          "optional": true
+        },
+        {
+          "name": "from_token",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "optional": true,
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "step",
+          "type": "u16"
+        },
+        {
+          "name": "choice",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "inputs",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "Slot"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_config",
+      "docs": [
+        "One-time: the admin and the forwarder programs whose reports are accepted."
+      ],
+      "discriminator": [
+        23,
+        235,
+        115,
+        232,
+        168,
+        96,
+        1,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "forwarders",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "on_report",
+      "docs": [
+        "Chainlink CRE: the keystone forwarder CPIs here with a DON-verified report."
+      ],
+      "discriminator": [
+        214,
+        173,
+        18,
+        221,
+        173,
+        148,
+        151,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "state"
+        },
+        {
+          "name": "forwarder_authority",
+          "docs": [
+            "The forwarder's PDA signer for this receiver (checked in the handler)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "_metadata",
+          "type": "bytes"
+        },
+        {
+          "name": "report",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "open_vault",
+      "docs": [
+        "Open the process's vault for a cash asset (an SPL token account it controls)."
+      ],
+      "discriminator": [
+        181,
+        248,
+        228,
+        67,
+        6,
+        175,
+        37,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "process"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_asset",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "poke",
+      "docs": [
+        "Anyone: run whatever can run now (e.g. after a top-up, or a due timer)."
+      ],
+      "discriminator": [
+        46,
+        24,
+        16,
+        107,
+        212,
+        9,
+        17,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "seal_definition",
+      "docs": [
+        "Verify the hash, check the workflow, and freeze the definition."
+      ],
+      "discriminator": [
+        136,
+        57,
+        52,
+        89,
+        228,
+        238,
+        172,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "definition",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_forwarders",
+      "discriminator": [
+        21,
+        104,
+        160,
+        77,
+        49,
+        12,
+        107,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "forwarders",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "start_process",
+      "docs": [
+        "Start a run: the signer holds the start step's role."
+      ],
+      "discriminator": [
+        158,
+        86,
+        242,
+        53,
+        82,
+        203,
+        83,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  99
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "definition"
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "definition"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        },
+        {
+          "name": "roles",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "mints",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "start_step",
+          "type": "u16"
+        },
+        {
+          "name": "inputs",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "Slot"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Take your cash out of the process."
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        },
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "to_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "asset",
+          "type": "u8"
+        },
+        {
+          "name": "base",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "write_definition",
+      "docs": [
+        "Append one chunk, written straight into the account (it grows to fit)."
+      ],
+      "discriminator": [
+        179,
+        25,
+        77,
+        156,
+        90,
+        134,
+        232,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "definition",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bytes",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Definition",
+      "discriminator": [
+        9,
+        243,
+        52,
+        195,
+        10,
+        105,
+        246,
+        45
+      ]
+    },
+    {
+      "name": "Process",
+      "discriminator": [
+        97,
+        144,
+        176,
+        162,
+        212,
+        229,
+        11,
+        199
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "StepRun",
+      "discriminator": [
+        25,
+        174,
+        139,
+        90,
+        216,
+        144,
+        91,
+        157
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6001,
+      "name": "DivideByZero",
+      "msg": "Division by zero"
+    },
+    {
+      "code": 6002,
+      "name": "BadExpression",
+      "msg": "Malformed expression in the definition"
+    },
+    {
+      "code": 6003,
+      "name": "BadDefinition",
+      "msg": "The definition is malformed or exceeds the engine's limits"
+    },
+    {
+      "code": 6004,
+      "name": "NotSealed",
+      "msg": "The definition is not sealed yet"
+    },
+    {
+      "code": 6005,
+      "name": "AlreadySealed",
+      "msg": "The definition is already sealed"
+    },
+    {
+      "code": 6006,
+      "name": "HashMismatch",
+      "msg": "The definition bytes do not match their hash"
+    },
+    {
+      "code": 6007,
+      "name": "NotCreator",
+      "msg": "Only the definition's creator can write it"
+    },
+    {
+      "code": 6008,
+      "name": "StepNotActive",
+      "msg": "That step is not waiting (no token on it)"
+    },
+    {
+      "code": 6009,
+      "name": "JoinNotReady",
+      "msg": "A parallel join is still waiting for its other branches"
+    },
+    {
+      "code": 6010,
+      "name": "NotDue",
+      "msg": "That step's time has not come yet"
+    },
+    {
+      "code": 6011,
+      "name": "GuardNotMet",
+      "msg": "The message's guard does not hold"
+    },
+    {
+      "code": 6012,
+      "name": "FieldNotSet",
+      "msg": "A field this step needs is not set yet"
+    },
+    {
+      "code": 6013,
+      "name": "BadInputs",
+      "msg": "Wrong number or type of inputs for this step"
+    },
+    {
+      "code": 6014,
+      "name": "OracleOutOfBounds",
+      "msg": "An oracle value is outside the bounds the definition allows"
+    },
+    {
+      "code": 6015,
+      "name": "OracleOnlyViaReport",
+      "msg": "Oracle values arrive only in CRE reports"
+    },
+    {
+      "code": 6016,
+      "name": "WrongRole",
+      "msg": "The signer does not hold the role for this step"
+    },
+    {
+      "code": 6017,
+      "name": "WrongStepKind",
+      "msg": "This step cannot be run this way"
+    },
+    {
+      "code": 6018,
+      "name": "NoBranch",
+      "msg": "No branch of this gateway applies; choose one"
+    },
+    {
+      "code": 6019,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient balance for this asset operation"
+    },
+    {
+      "code": 6020,
+      "name": "HoldingsFull",
+      "msg": "The process holdings ledger is full"
+    },
+    {
+      "code": 6021,
+      "name": "TooManyTokens",
+      "msg": "Too many live tokens"
+    },
+    {
+      "code": 6022,
+      "name": "BadDepositAccounts",
+      "msg": "Deposit accounts are missing or do not match"
+    },
+    {
+      "code": 6023,
+      "name": "UntrustedForwarder",
+      "msg": "The report did not come from an accepted Chainlink forwarder"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidForwarderAuthority",
+      "msg": "forwarder_authority is not the forwarder's PDA for this receiver"
+    },
+    {
+      "code": 6025,
+      "name": "BadReport",
+      "msg": "Report payload does not decode"
+    },
+    {
+      "code": 6026,
+      "name": "WrongProcess",
+      "msg": "The report is for a different process"
+    },
+    {
+      "code": 6027,
+      "name": "NotAdmin",
+      "msg": "Only the config admin can do this"
+    },
+    {
+      "code": 6028,
+      "name": "ProcessFinished",
+      "msg": "The process has finished"
+    },
+    {
+      "code": 6029,
+      "name": "NotCash",
+      "msg": "Asset is not cash (no SPL token behind it)"
+    }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "docs": [
+        "Program-wide settings: who may deliver CRE reports."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "forwarders",
+            "docs": [
+              "Keystone forwarder programs whose CPIs are accepted (the DON's, and the",
+              "CRE simulator's mock forwarder on devnet)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Definition",
+      "docs": [
+        "A compiled workflow, addressed by the SHA-256 of its bytes. Written in",
+        "chunks, then sealed (hash verified); immutable after that."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "sealed",
+            "type": "bool"
+          },
+          {
+            "name": "len",
+            "docs": [
+              "Total length once fully written."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Holding",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Fixed point, 10 decimals."
+            ],
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Process",
+      "docs": [
+        "One run of a workflow (e.g. one issuance of a note)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "definition",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "roles",
+            "docs": [
+              "One key per role (pool), in definition order."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "mints",
+            "docs": [
+              "SPL mint per asset (default key for ISSUED assets)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "tokens",
+            "docs": [
+              "Live BPMN tokens: a multiset of step indexes (parallel branches)."
+            ],
+            "type": {
+              "vec": "u16"
+            }
+          },
+          {
+            "name": "values",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Slot"
+                }
+              }
+            }
+          },
+          {
+            "name": "holdings",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Holding"
+                }
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "steps_run",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Slot",
+      "docs": [
+        "One field value. tag: 0 unset, 1 number (i128 LE in data[0..16]),",
+        "2 text (UTF-8, zero padded), 3 public key."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u8"
+          },
+          {
+            "name": "data",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StepRun",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "process",
+            "type": "pubkey"
+          },
+          {
+            "name": "step",
+            "type": "u16"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

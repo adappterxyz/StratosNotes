@@ -1,0 +1,17 @@
+[toolchain]
+anchor_version = "0.31.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+flow_engine = "9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx"
+mock_forwarder = "E5yD9T1GUpnrkWqiDgmqQVq621Ydc4LSnhrcnYwTuNoX"
+
+[programs.devnet]
+flow_engine = "9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
