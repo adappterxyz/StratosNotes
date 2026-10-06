@@ -23,6 +23,23 @@
         600,
         400
       ]
+    },
+    {
+      "type": "phoenix",
+      "name": "12M Phoenix (memory) on ETH",
+      "process": "8SvcVvQ8vYAtVdLs4gF3Rc1MNybqWh2kFfPCTpD1heGG",
+      "definition": "9i6eMKoTXbFovMx2TNsUewAyfhdYWgcBZkqYKESsL4pa",
+      "strikeAt": 1791280905,
+      "observations": [
+        1791281085,
+        1791281265,
+        1791281445,
+        1791281625
+      ],
+      "investors": [
+        600,
+        400
+      ]
     }
   ]
 }

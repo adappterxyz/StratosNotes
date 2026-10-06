@@ -103,7 +103,19 @@ async function issue(type: ProductType) {
   console.log(JSON.stringify({ process: proc.toBase58(), definition: definition.toBase58(), strikeAt: new Date(strikeAt * 1000).toISOString(), observations: obs.map(t => new Date(t * 1000).toISOString()) }, null, 2));
 }
 
+/** A demo investor moves note units to another demo wallet (in whole or in part). */
+async function transfer(processAddr: string, from: string, to: string, units: number) {
+  const proc = new PublicKey(processAddr);
+  const seller = demoKey(from), buyer = demoKey(to);
+  await fund(seller.publicKey, 0.01);
+  const e = engineFor(seller);
+  const p = await e.process(proc);
+  await e.send([await e.transferUnits(proc, p.definition, 0, buyer.publicKey, dec(units))]);
+  console.log(`${from} -> ${to}: ${units} units (${buyer.publicKey.toBase58()})`);
+}
+
 const [cmd, arg] = process.argv.slice(2);
 if (cmd === 'init') await init();
 else if (cmd === 'issue') await issue((arg as ProductType) ?? 'fcn');
+else if (cmd === 'transfer') await transfer(arg, process.argv[4], process.argv[5], Number(process.argv[6]));
 else console.log('usage: devnet.ts init | issue [fcn|reverse-convertible|phoenix|snowball|ppn]');

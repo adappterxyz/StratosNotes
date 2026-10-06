@@ -52,7 +52,7 @@ export function instantiateProduct(p: ProductParams): InstantiatedProduct {
     params: { holdingAssetId: 'note', payer: ISSUER, amountSource: 'expr', amountExpr: perUnit, ...(retire ? { retire: true } : {}) },
   });
   const oracleField = (name: string) => field(name, 'Decimal', {
-    oracle: { feed: p.underlying.feed, feedChain: p.underlying.feedChain, min: num(p.underlying.minPrice), max: num(p.underlying.maxPrice), staleness: 3600 },
+    oracle: { feed: p.underlying.feed, feedChain: p.underlying.feedChain, min: num(p.underlying.minPrice), max: num(p.underlying.maxPrice), staleness: p.underlying.staleness ?? 3600 },
   });
   const obsDate = (k: number) => `obsDate${k}`;
   const issuePrice = pct(p.issuePricePct);

@@ -26,6 +26,8 @@ export interface ProductParams {
     /** Bounds every observed price must sit in (checked on-chain). */
     minPrice: number;
     maxPrice: number;
+    /** Oldest acceptable round, seconds: the feed's heartbeat (default 3600). */
+    staleness?: number;
   };
   /** Number of observations per issuance; the last one is maturity. Dates are set per issuance at pre-trade. */
   observations: number;
@@ -97,11 +99,12 @@ export function reservePerUnit(p: ProductParams): number | null {
   return r * p.observations;
 }
 
-// Chainlink ETH/USD and BTC/USD on Ethereum mainnet (8 decimals).
+// Chainlink price feeds on Ethereum mainnet (8 decimals), with their heartbeats:
+// ETH/USD and BTC/USD update at least hourly, SOL/USD at least daily.
 export const FEEDS = {
-  ETH: { symbol: 'ETH', feed: '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419', feedChain: 'ethereum-mainnet', minPrice: 1, maxPrice: 1_000_000 },
-  BTC: { symbol: 'BTC', feed: '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c', feedChain: 'ethereum-mainnet', minPrice: 1, maxPrice: 10_000_000 },
-  SOL: { symbol: 'SOL', feed: '0x4ffC43a60e009B551865A93d232E33Fce9f01507', feedChain: 'ethereum-mainnet', minPrice: 0.01, maxPrice: 100_000 },
+  ETH: { symbol: 'ETH', feed: '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419', feedChain: 'ethereum-mainnet', minPrice: 1, maxPrice: 1_000_000, staleness: 3600 },
+  BTC: { symbol: 'BTC', feed: '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c', feedChain: 'ethereum-mainnet', minPrice: 1, maxPrice: 10_000_000, staleness: 3600 },
+  SOL: { symbol: 'SOL', feed: '0x4ffC43a60e009B551865A93d232E33Fce9f01507', feedChain: 'ethereum-mainnet', minPrice: 0.01, maxPrice: 100_000, staleness: 86400 },
 };
 
 const base = { issuePricePct: 100, underlying: FEEDS.ETH, observations: 4 };
