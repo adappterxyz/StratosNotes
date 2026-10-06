@@ -26,7 +26,7 @@ export type AiResult =
 
 const INTENTS: Record<Intent, string> = {
   product: 'Design or issue a structured note from terms: fixed coupon note, autocallable, phoenix, snowball, reverse convertible or principal-protected note',
-  edit: 'Change the workflow that is open: add, remove or modify steps, fields, conditions, dates, payments or rules',
+  edit: 'Change the note or workflow that is open: how or when it pays (bonuses, fees, coupons, redemption), its steps, fields, conditions, dates or rules, e.g. "when it autocalls pay an extra 1%", "add a fee", "observe monthly"',
   question: 'Ask how something works or for an explanation or advice; or just chat. Nothing should be built or changed',
 };
 const PRODUCTS: Record<ProductType, string> = {
@@ -64,7 +64,8 @@ Step kinds: "start"; "task" (a person in that pool acts, may enter fields); "aut
 Links: "next" (same pool), "branches" (decisions), "sendTo" (step ids in OTHER pools). Every path ends in an "end".
 Fields: {name, type: Decimal|Int|Date|Text|Party|Bool}; add "formula" (e.g. "missed1 + 1") for computed fields, or "oracle": {feed, feedChain, min, max} for a Chainlink price observed by CRE (only on "auto" steps). Field names are camelCase and shared by all pools.
 Timers: "timerField" (a Date field: the step waits for it). "untilField" on a "task": anyone may repeat it until that date (a subscription book).
-Payments ("ops", applied in order): {assetId, operation, params}. operation: "deposit" (USDC from the person running the task; params.amountSource "field"|"expr" with amountField/amountExpr), "mint" (params.owner = pool name), "transfer" (from, to), "swap" (deliveryParty, paymentParty, counterAssetId, amounts), "distribute" (pay every holder of params.holdingAssetId: params.payer pays amountExpr per unit; params.retire true redeems the units).
+Payments ("ops", applied in order): {assetId, operation, params}. operation: "deposit" (USDC from the person running the task; params.amountSource "field"|"expr" with amountField/amountExpr), "mint" (params.owner = pool name), "transfer" (params.from and params.to are POOL names; params.amountSource "expr", params.amountExpr = the TOTAL amount), "swap" (deliveryParty, paymentParty, counterAssetId, amounts), "distribute" (pays EVERY HOLDER of params.holdingAssetId, i.e. the investors: params.payer pays amountExpr PER UNIT held; params.retire true redeems the units).
+Who gets paid decides the operation: investors/noteholders -> "distribute"; one named pool (the issuer, the paying agent, a fee to someone) -> "transfer" with from/to. A fee "per unit" or "% of the notional" paid to one pool is a transfer of the total, e.g. a 0.1% fee to the paying agent from the issuer: {"assetId":"cash","operation":"transfer","params":{"from":"Issuer","to":"Paying Agent","amountSource":"expr","amountExpr":"notional * 1 / 1000"}}.
 Conditions and amounts are expressions over fields: + - * / and comparisons, "and"/"or".
 Reply with a patch: "upsert" new steps and every changed step written out in full (e.g. the step before an inserted one, with its new "next"), and "remove" ids of deleted steps. Keep ids of unchanged steps; do not repeat unchanged steps.`;
 
