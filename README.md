@@ -13,6 +13,8 @@ the strike from a Chainlink price feed on the strike date, observes on every
 date, and each observation runs the payoff on-chain: coupons, autocall,
 knock-in, redemption. Investors withdraw what they are paid.
 
+Submission: [docs/SUBMISSION.md](docs/SUBMISSION.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
+
 ## How it works
 
 ```
