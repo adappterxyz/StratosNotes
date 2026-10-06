@@ -22,6 +22,7 @@ import {
 import PropertiesPanel from '../components/PropertiesPanel';
 import { flowModdle } from '../lib/bpmnProps';
 import { fitReadable } from '../lib/fit';
+import { tagTypes } from '../lib/bpmnTheme';
 import { DEPLOYMENT } from '../config';
 import { useEngine } from '../lib/engine';
 
@@ -72,7 +73,7 @@ export default function Studio() {
     const m = new Modeler({ container: host.current, moddleExtensions: { flow: flowModdle } });
     modeler.current = m;
     m.on('selection.changed', (e: any) => setSelected(e.newSelection?.[0] ?? null));
-    m.on('commandStack.changed', () => { setVersion(v => v + 1); });
+    m.on('commandStack.changed', () => { tagTypes(m); setVersion(v => v + 1); });
     return () => { if (modeler.current === m) modeler.current = null; m.destroy(); };
   }, []);
   useEffect(() => { const t = setTimeout(recheck, 350); return () => clearTimeout(t); }, [version, recheck]);
@@ -82,6 +83,7 @@ export default function Studio() {
     if (!m) return;
     try { await m.importXML(xml); } catch (e) { if (m !== modeler.current) return; throw e; }
     if (m !== modeler.current) return; // replaced while importing (React remount)
+    tagTypes(m);
     fitReadable(m.get('canvas'));
     if (opts.pristine) setPristineHash(hashOf(xml));
     for (const id of opts.highlight ?? []) { try { (m.get('canvas') as any).addMarker(id, 'active-step'); } catch { /* removed */ } }

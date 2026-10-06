@@ -3,6 +3,7 @@ import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import { fitReadable } from '../lib/fit';
+import { tagTypes } from '../lib/bpmnTheme';
 
 /** The note's workflow, with the steps holding a live token highlighted. */
 export default function BpmnView({ xml, active }: { xml: string; active: string[] }) {
@@ -13,7 +14,7 @@ export default function BpmnView({ xml, active }: { xml: string; active: string[
     const v = new NavigatedViewer({ container: host.current });
     viewer.current = v;
     let alive = true;
-    v.importXML(xml).then(() => { if (alive) fitReadable(v.get('canvas')); }).catch(() => {});
+    v.importXML(xml).then(() => { if (alive) { tagTypes(v); fitReadable(v.get('canvas')); } }).catch(() => {});
     return () => { alive = false; viewer.current = null; v.destroy(); };
   }, [xml]);
   useEffect(() => {

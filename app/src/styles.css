@@ -106,9 +106,44 @@ table.t td.r, table.t th.r { text-align: right; }
 .tl.done .mark { background: var(--accent); border-color: var(--accent); }
 .tl.now .mark { border-color: var(--warn); background: var(--warn-soft); }
 
-.bpmn { height: 360px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; overflow: hidden; }
+.bpmn { height: 360px; border: 1px solid var(--line); border-radius: var(--r); background: var(--cv-bg); overflow: hidden; }
 .bpmn .djs-container svg { max-width: none; }
-.bpmn .active-step:not(.djs-connection) .djs-visual > :nth-child(1) { stroke: #0e8f66 !important; stroke-width: 3px !important; fill: #e2f4ec !important; }
+
+/* BPMN canvas: dark in both themes, as in Flow. bpmn-js paints black-on-white
+   inline, so shapes, labels, markers and the editor chrome are overridden here. */
+.bpmn {
+  --cv-bg: #0c1419; --cv-shape: #15212a; --cv-pool: #101a21; --cv-stroke: #6f8591; --cv-text: #e3ebee;
+  --cv-muted: #8fa3ad; --cv-line: #24333d; --cv-accent: #3ddc97; --cv-start: #3ddc97; --cv-end: #f2867b; --cv-gw: #e9b05b;
+  color-scheme: dark;
+}
+.bpmn .djs-container { background: var(--cv-bg) !important; }
+.bpmn .djs-visual > :is(rect, circle, polygon, path, ellipse) { stroke: var(--cv-stroke) !important; fill: var(--cv-shape) !important; }
+.bpmn .t-pool .djs-visual > rect { fill: var(--cv-pool) !important; }
+.bpmn .djs-label, .bpmn .djs-visual text, .bpmn .djs-visual tspan { fill: var(--cv-text) !important; }
+.bpmn .djs-connection .djs-visual > path { fill: none !important; stroke: var(--cv-stroke) !important; }
+.bpmn marker > * { fill: var(--cv-stroke) !important; stroke: var(--cv-stroke) !important; }
+.bpmn .djs-hit { fill: none !important; stroke: transparent !important; }
+.bpmn .djs-outline { fill: none !important; stroke: var(--cv-accent) !important; }
+.bpmn .djs-element.selected .djs-outline { stroke-width: 2px !important; }
+.bpmn .t-start .djs-visual > circle { fill: color-mix(in srgb, var(--cv-start) 15%, var(--cv-shape)) !important; stroke: var(--cv-start) !important; }
+.bpmn .t-end .djs-visual > circle { fill: color-mix(in srgb, var(--cv-end) 15%, var(--cv-shape)) !important; stroke: var(--cv-end) !important; }
+.bpmn .t-gw .djs-visual > polygon { fill: color-mix(in srgb, var(--cv-gw) 15%, var(--cv-shape)) !important; stroke: var(--cv-gw) !important; }
+.bpmn .t-gw .djs-visual > path { fill: var(--cv-gw) !important; stroke: var(--cv-gw) !important; }
+.bpmn .active-step:not(.djs-connection) .djs-visual > :nth-child(1) { stroke: var(--cv-accent) !important; stroke-width: 3px !important; fill: color-mix(in srgb, var(--cv-accent) 22%, var(--cv-shape)) !important; }
+.bpmn .djs-palette, .bpmn .djs-context-pad .entry { background: var(--cv-shape) !important; border-color: var(--cv-line) !important; }
+.bpmn .djs-palette .entry, .bpmn .djs-context-pad .entry { color: var(--cv-muted) !important; }
+.bpmn .djs-palette .entry:hover, .bpmn .djs-context-pad .entry:hover { color: var(--cv-accent) !important; }
+.bpmn .djs-palette .separator { border-color: var(--cv-line) !important; }
+.bpmn .djs-direct-editing-parent { background: var(--cv-shape) !important; color: var(--cv-text) !important; }
+/* The replace menu renders at <body>, outside .bpmn. */
+.djs-popup {
+  --popup-background-color: #111b23; --popup-border-color: #24333d; --popup-description-color: #8fa3ad;
+  --popup-entry-title-color: #e3ebee; --popup-entry-hover-color: rgba(61,220,151,.16); --popup-header-group-divider-color: #24333d;
+  background: #111b23 !important; color: #e3ebee !important; border: 1px solid #24333d !important;
+}
+.djs-popup .entry, .djs-popup .djs-popup-entry-name, .djs-popup .djs-popup-group, .djs-popup .djs-popup-header, .djs-popup .djs-popup-body { background: transparent !important; color: #e3ebee !important; }
+.djs-popup .entry:hover, .djs-popup .entry.active { background: rgba(61,220,151,.16) !important; }
+.djs-popup input { background: #0c1419 !important; color: #e3ebee !important; border: 1px solid #24333d !important; }
 
 .chart { width: 100%; height: auto; display: block; }
 .chart text { fill: var(--muted); font: 11px var(--mono); }
