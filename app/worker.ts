@@ -1,5 +1,6 @@
 /**
- * StratosNotes Worker: serves the marketplace app and a devnet test-USDC
+ * StratosNotes Worker: serves the landing page (/), the marketplace app
+ * (/app/, a single-page app) and a devnet test-USDC
  * faucet. The faucet key is the test mint's authority (a devnet-only key held
  * as the FAUCET_KEY secret); it mints to a token account the caller already
  * created, once per wallet per cooldown.
@@ -20,6 +21,7 @@ interface Env {
 
 const AMOUNT = 2_000n * 1_000_000n; // 2,000 test USDC (6 decimals)
 const COOLDOWN_SEC = 600;
+const SITE = 'https://sp.stratoslab.app';
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 /**
@@ -75,6 +77,21 @@ export default {
       try { return await ai(req, env); } catch (e) { return json({ kind: 'error', error: e instanceof Error ? e.message : String(e) }, 502); }
     }
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
+    // The app used to live at the root of stratosnotes.<account>.workers.dev: send old links to its new home.
+    const legacy = /^\/(note|issue|studio|portfolio)(\/|$)/.test(url.pathname);
+    if (url.hostname.endsWith('.workers.dev')) {
+      const path = url.pathname === '/' || legacy ? '/app' + (legacy ? url.pathname : '/') : url.pathname;
+      return Response.redirect(`${SITE}${path}${url.search}`, 301);
+    }
+    if (legacy) return Response.redirect(`${url.origin}/app${url.pathname}${url.search}`, 301);
+    if (url.pathname === '/app') return Response.redirect(`${url.origin}/app/${url.search}`, 301);
+    if (url.pathname.startsWith('/app/')) {
+      const res = await env.ASSETS.fetch(req);
+      if (res.status !== 404) return res;
+      // A client-side route (/app/note/…): serve the app shell; missing files stay 404.
+      if (/\.[a-z0-9]+$/i.test(url.pathname)) return res;
+      return env.ASSETS.fetch(new Request(new URL('/app/', url), req));
+    }
     return env.ASSETS.fetch(req);
   },
 };

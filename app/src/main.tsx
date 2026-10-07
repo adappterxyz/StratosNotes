@@ -15,7 +15,7 @@ function Root() {
     <ConnectionProvider endpoint={RPC_URL}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
-          <BrowserRouter>
+          <BrowserRouter basename="/app">
             <App />
           </BrowserRouter>
         </WalletModalProvider>

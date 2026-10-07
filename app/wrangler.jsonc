@@ -7,9 +7,14 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // dist/ = the landing page at /, the app under /app/ (npm run build).
+    "not_found_handling": "none",
+    "run_worker_first": ["/", "/api/*", "/app", "/app/*"]
   },
+  "routes": [{ "pattern": "sp.stratoslab.app", "custom_domain": true }],
+  // Kept so old stratosnotes.<account>.workers.dev links redirect to sp.stratoslab.app.
+  "workers_dev": true,
+  "preview_urls": false,
   "ai": { "binding": "AI" },
   "kv_namespaces": [{ "binding": "FAUCET", "id": "c1569994e667444a93855abd7b87f43a" }],
   "vars": {

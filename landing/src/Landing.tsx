@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import './notes.css';
 import { EDGES, STEPS, type Chain } from './lifecycle';
 
-const APP_URL = 'https://stratosnotes.uranusim.workers.dev';
+const APP_URL = '/app/';
 const REPO_URL = 'https://github.com/adappterxyz/StratosNotes';
 const FLOW_URL = 'https://stratoslab.app';
 const EXPLORER = (tx: string) => `https://explorer.solana.com/tx/${tx}?cluster=devnet`;
@@ -153,7 +153,7 @@ export default function Landing() {
             <a href={REPO_URL} target="_blank" rel="noopener">Code</a>
           </nav>
           <div className="nav-cta">
-            <a href={APP_URL} target="_blank" rel="noopener" className="btn btn-primary">Open the app <span className="arrow">→</span></a>
+            <a href={APP_URL} className="btn btn-primary">Open the app <span className="arrow">→</span></a>
           </div>
         </div>
       </header>
@@ -175,7 +175,7 @@ export default function Landing() {
             </p>
             <div className="hero-cta" data-reveal data-reveal-d="3">
               <a href="#lifecycle" className="btn btn-primary">Walk the lifecycle <span className="arrow">→</span></a>
-              <a href={APP_URL} target="_blank" rel="noopener" className="btn btn-ghost">Issue a note</a>
+              <a href={APP_URL} className="btn btn-ghost">Issue a note</a>
             </div>
             <div className="pipeline-tags" data-reveal data-reveal-d="4">
               <span className="chip"><i style={{ background: 'var(--blue)' }} /> Term sheet</span>
@@ -416,7 +416,7 @@ export default function Landing() {
               <h2 style={{ marginTop: 18 }}>Your next note<br />doesn't need a structuring desk.</h2>
               <p>Issue a phoenix on ETH with observations three minutes apart and watch Chainlink CRE run its whole life on Solana devnet.</p>
               <div className="hero-cta">
-                <a href={APP_URL} target="_blank" rel="noopener" className="btn btn-primary">Open the app <span className="arrow">→</span></a>
+                <a href={APP_URL} className="btn btn-primary">Open the app <span className="arrow">→</span></a>
                 <a href={REPO_URL} target="_blank" rel="noopener" className="btn btn-ghost">Read the code</a>
               </div>
             </div>

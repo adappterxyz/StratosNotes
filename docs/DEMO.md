@@ -19,10 +19,10 @@ live; a finished one proves the payouts.
 3. **Wallet.** Phantom (or Solflare) on **devnet**, with ~0.2 devnet SOL
    (faucet.solana.com). In the app, press **Get test USDC** once.
 4. **Tabs, in order:**
-   1. Marketplace: https://stratosnotes.uranusim.workers.dev
-   2. The in-flight note: `/note/<process>`
-   3. Studio: `/studio`
-   4. The finished phoenix: `/note/8SvcVvQ8vYAtVdLs4gF3Rc1MNybqWh2kFfPCTpD1heGG`
+   1. Marketplace: https://sp.stratoslab.app/app
+   2. The in-flight note: `https://sp.stratoslab.app/app/note/<process>`
+   3. Studio: `https://sp.stratoslab.app/app/studio`
+   4. The finished phoenix: `https://sp.stratoslab.app/app/note/8SvcVvQ8vYAtVdLs4gF3Rc1MNybqWh2kFfPCTpD1heGG`
    5. Terminal: `pm2 logs stratosnotes-keeper --lines 0`
    6. Solana Explorer (devnet), ready to paste a transaction.
 

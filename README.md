@@ -13,7 +13,7 @@ the strike from a Chainlink price feed on the strike date, observes on every
 date, and each observation runs the payoff on-chain: coupons, autocall,
 knock-in, redemption. Investors withdraw what they are paid.
 
-Site: https://sp.stratoslab.app · App: https://stratosnotes.uranusim.workers.dev · Submission: [docs/SUBMISSION.md](docs/SUBMISSION.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
+Site: https://sp.stratoslab.app · App: https://sp.stratoslab.app/app · Submission: [docs/SUBMISSION.md](docs/SUBMISSION.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
 
 ## How it works
 
@@ -76,7 +76,7 @@ diagrams exported from Flow import unchanged.
 | Engine program | `9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx` |
 | Engine config (accepted forwarders) | `CVpuv1Mu3JEpWM4aUD7VbCqfrzGobG3oLmpdUFWX4Zm` |
 | Test USDC mint (6 decimals) | `ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6` (faucet in the app) |
-| App | https://stratosnotes.uranusim.workers.dev |
+| App | https://sp.stratoslab.app/app |
 | Chainlink forwarders accepted | `7kuEAA3m…` (CRE simulator), `CXsKEJcs…` (staging DON) |
 
 ## Repository
@@ -87,8 +87,8 @@ diagrams exported from Flow import unchanged.
 | `solana/programs/mock_forwarder` | Local stand-in for the keystone forwarder (same CPI shape), for tests |
 | `packages/flow` | BPMN parser/builder, expression language, compiler + Borsh codec, products and reference payoff, keeper logic, client |
 | `cre/notes-keeper` | The Chainlink CRE workflow |
-| `app` | Marketplace, offering pages, self-service issuance, studio, portfolio (React + Solana wallet adapter) |
-| `landing` | The landing page at sp.stratoslab.app (`npm run deploy` there) |
+| `app` | Marketplace, offering pages, self-service issuance, studio, portfolio (React + Solana wallet adapter), served at sp.stratoslab.app/app; its Worker also serves the landing page, the AI endpoint and the faucet (`npm run deploy` in `app` builds and deploys both) |
+| `landing` | The landing page at sp.stratoslab.app (built into the app Worker) |
 | `scripts/e2e.sh` | Every product end to end on a local validator |
 
 ## Run it

@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5190",
-    "build": "tsc --noEmit && vite build",
+    "build": "rm -rf dist && tsc --noEmit && vite build && npm --prefix ../landing run build && cp -r ../landing/dist/. dist/",
     "preview": "vite preview",
-    "deploy": "vite build && wrangler deploy"
+    "deploy": "rm -rf dist && vite build && npm --prefix ../landing run build && cp -r ../landing/dist/. dist/ && CLOUDFLARE_ACCOUNT_ID=325f8b322c30ee0f5460cfdaef82ecf5 wrangler deploy"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.1",

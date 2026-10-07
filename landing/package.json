@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "deploy": "npm run build && CLOUDFLARE_ACCOUNT_ID=325f8b322c30ee0f5460cfdaef82ecf5 wrangler deploy",
-    "deploy:pages": "npm run build && CLOUDFLARE_ACCOUNT_ID=325f8b322c30ee0f5460cfdaef82ecf5 wrangler pages deploy dist --project-name=stratosnotes-landing --commit-dirty=true"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.1.0",

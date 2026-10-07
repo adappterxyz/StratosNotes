@@ -7,7 +7,7 @@ Chainlink CRE act as the calculation agent: it fixes the strike, observes the
 underlying on every date and triggers every coupon, autocall and redemption.
 
 - Site: https://sp.stratoslab.app
-- App: https://stratosnotes.uranusim.workers.dev (Solana devnet, test USDC faucet built in)
+- App: https://sp.stratoslab.app/app (Solana devnet, test USDC faucet built in)
 - Code: https://github.com/adappterxyz/StratosNotes
 - Demo script: [DEMO.md](DEMO.md)
 
