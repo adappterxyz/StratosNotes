@@ -17,3 +17,6 @@ evm/out/
 evm/cache/
 evm/broadcast/
 evm/lib/
+
+# CCIP relayer state (scripts/ccip-relayer.sh)
+.ccip-relayer/

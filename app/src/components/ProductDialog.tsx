@@ -68,7 +68,7 @@ export function ProductForm({ p, set }: { p: ProductParams; set: (patch: Partial
       )}
       {use.autocall && <NumField id="pd-ac" label="Autocall level %" value={p.autocallLevelPct} onChange={v => set({ autocallLevelPct: v })} />}
       {use.autocall && <NumField id="pd-acf" label="Autocall from observation" value={p.autocallFromPeriod ?? 1} step="1" onChange={v => set({ autocallFromPeriod: v })} />}
-      {use.knockIn && <NumField id="pd-ki" label="Knock-in barrier %" value={p.knockInBarrierPct} onChange={v => set({ knockInBarrierPct: v })} hint="Below it: final / strike in cash" />}
+      {use.knockIn && <NumField id="pd-ki" label="Knock-in barrier %" value={p.knockInBarrierPct} onChange={v => set({ knockInBarrierPct: v })} hint={p.settlement === 'physical' ? 'Below it: the underlying\'s token, units ÷ strike' : 'Below it: final / strike in cash'} />}
       {use.knockIn && (
         <div className="field">
           <label htmlFor="pd-settle">Settlement below the barrier</label>

@@ -337,7 +337,7 @@ export function IssuePanel({ doc, built }: { doc: DocInfo; built: Built | null }
         </div>
       )}
       <div className="section">
-        {deposits.length > 0 && <p className="xs muted">{deposits.map(s => s.name).join(', ')} deposits USDC from your wallet (devnet test USDC {short(DEPLOYMENT.testUsdc)}): use Test USDC in the top bar if you have none.</p>}
+        {deposits.length > 0 && <p className="xs muted">{deposits.map(s => s.name).join(', ')} {deposits.length > 1 ? 'deposit' : 'deposits'} tokens from your Solana wallet ({[...new Set(deposits.map(s => built.ir.assets[s.deposit!]?.token ?? 'tUSD'))].join(', ')}, devnet test tokens): use Test USDC in the top bar, and the Get buttons above, if you have none.</p>}
         <button className="btn primary lg" disabled={!connected || busy} onClick={issue}>
           {connected ? (busy ? 'Issuing…' : 'Publish and open the book') : 'Connect a wallet to issue'}
         </button>

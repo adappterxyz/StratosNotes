@@ -25,7 +25,9 @@ export function statusText(s: CcipStatus | undefined, sentAt: number, now: numbe
   const mins = Math.max(0, Math.round((now - sentAt) / 60));
   if (!s || !s.indexed) return { text: `Sent ${mins} min ago; CCIP is indexing it`, done: false, failed: false };
   if (s.state === 2) return { text: 'Delivered on Solana', done: true, failed: false };
-  if (s.state === 3) return { text: 'Failed on Solana: it can be retried from the CCIP explorer', done: false, failed: true };
+  // The DON's execute path cannot fit a token transfer plus our receiver in the offramp's heap; the
+  // StratosNotes relayer re-executes such messages manually (scripts/ccip-relayer.sh), usually within minutes.
+  if (s.state === 3) return { text: 'The CCIP executor could not deliver it; the StratosNotes relayer is re-executing it', done: false, failed: false };
   if (s.commitBlockTimestamp) return { text: `Committed on Solana; executing (${mins} min)`, done: false, failed: false };
   if (s.sendFinalized) return { text: `Finalized on Ethereum; committing (${mins} min)`, done: false, failed: false };
   return { text: `Waiting for Ethereum finality (${mins} of ~15 min)`, done: false, failed: false };
