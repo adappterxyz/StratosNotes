@@ -91,6 +91,21 @@
         600,
         400
       ]
+    },
+    {
+      "type": "reverse-convertible",
+      "name": "12M Reverse Convertible on ETH (physical, KI 101%)",
+      "process": "CviXTYq7RJPy7rt5Nw5riHcJXvpSqW8DNByhL9sd4d4C",
+      "definition": "3BHAQrciGDy5AWTMW93cphiVL5sHhd9YcYNti1mrYTmH",
+      "strikeAt": 1791365048,
+      "observations": [
+        1791365168,
+        1791365288
+      ],
+      "investors": [
+        600,
+        400
+      ]
     }
   ],
   "ccip": {
