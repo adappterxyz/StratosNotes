@@ -57,6 +57,49 @@
         600,
         400
       ]
+    },
+    {
+      "type": "fcn",
+      "name": "12M Fixed Coupon Note on ETH",
+      "process": "DFaUHwaGgwWkFAcQ74ZQ9cVGRMisCG4jg67ywFHVQxJm",
+      "definition": "3DR2hZT7P6bQQw2QFTaML5nzayNjVdLVxJoniqmgJTSo",
+      "strikeAt": 1791352754,
+      "observations": [
+        1791352934,
+        1791353114,
+        1791353294,
+        1791353474
+      ],
+      "investors": [
+        600,
+        400
+      ]
     }
-  ]
+  ],
+  "ccip": {
+    "router": "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+    "chains": {
+      "sepolia": "16015286601757825753"
+    },
+    "inbox": "J3vMDLJVHwQKncUTZu6bjMCm1SoDBN8HMxgJ6gECspW7",
+    "sender": "5p7DQgaFMW7n1VMWtGxYg1NVidi9JB66u1h2ckf6YmqB",
+    "tokenAccounts": {
+      "tUSD": {
+        "inbox": "qxxyKjbVFpUEL5o4yVXmgxCHDh4WyJbfTVzK2kGtznw",
+        "sender": "4sJZRLBpyZGFqUx89cgpcpZ9t4m1fHrHTVv4EGEC7NcH"
+      },
+      "tETH": {
+        "inbox": "B6swVcftHhieHaAjbMN5qPKW5rgehm5hN3B61EYL4nFR",
+        "sender": "4DPRi37Lb9PtJGSpmMBFNWQCuNxQ5r1kkTkcDbXL17ra"
+      },
+      "tBTC": {
+        "inbox": "35VRYmPqXTBm86XN34iu4b5kuJduwAFwpKMTBwX3Q6gk",
+        "sender": "FXQJgqHUvZdQ3DEyMmpZsMapBQfkLk7GtSraNqtBUa1e"
+      },
+      "tSOL": {
+        "inbox": "hnxJzKMo6PA2fDWY7FdiocDrz6BsynQmHKeUuEnVxj5",
+        "sender": "4gZEzjp4CpuA8X1MLxotRiqm1EpEtChgfk2m1UjF5nR8"
+      }
+    }
+  }
 }

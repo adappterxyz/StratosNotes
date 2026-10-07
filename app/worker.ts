@@ -6,7 +6,8 @@
  * created, once per wallet per cooldown.
  */
 import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
-import { createMintToInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token';
+import { createMintToInstruction, createTransferInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token';
+import solanaTokens from '../deployments/solana-tokens.json';
 import { runAi } from '../packages/flow/src/ai/pipeline';
 import { workersAiRunner } from '../packages/flow/src/ai/runner';
 import type { WorkflowDraft } from '../packages/flow/src/draft';
@@ -32,17 +33,34 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
  * refuse Workers' IPs, so the Worker never calls Solana: the app sends a
  * recent blockhash, gets the signed transaction back, and submits it itself.
  */
+/** Deliverable test tokens (for physically settled notes' delivery reserves), paid from the faucet's stock. */
+const TOKEN_DRIP: Record<string, { units: number }> = { tETH: { units: 5 }, tBTC: { units: 0.2 }, tSOL: { units: 100 } };
+
 async function faucet(req: Request, env: Env): Promise<Response> {
-  const body = await req.json().catch(() => null) as { owner?: string; blockhash?: string } | null;
+  const body = await req.json().catch(() => null) as { owner?: string; blockhash?: string; token?: string } | null;
+  const token = body?.token ?? 'tUSD';
+  if (token !== 'tUSD' && !TOKEN_DRIP[token]) return json({ error: `No faucet for ${token}.` }, 400);
   let owner: PublicKey;
   try { owner = new PublicKey(body?.owner ?? ''); } catch { return json({ error: 'Send { "owner": "<wallet address>", "blockhash": "<recent blockhash>" }.' }, 400); }
   if (!body?.blockhash || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(body.blockhash)) return json({ error: 'A recent blockhash is required.' }, 400);
-  const key = `faucet:${owner.toBase58()}`;
+  const key = token === 'tUSD' ? `faucet:${owner.toBase58()}` : `faucet:${token}:${owner.toBase58()}`;
   const last = Number(await env.FAUCET.get(key) ?? 0);
   const now = Math.floor(Date.now() / 1000);
   if (now - last < COOLDOWN_SEC) return json({ error: `Already sent; try again in ${Math.ceil((COOLDOWN_SEC - (now - last)) / 60)} min.` }, 429);
-  const mint = new PublicKey(env.TEST_USDC);
   const signer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(env.FAUCET_KEY)));
+  if (token !== 'tUSD') {
+    // tETH/tBTC/tSOL: a transfer from the faucet's own stock (the caller has opened its token account).
+    const t = (solanaTokens as Record<string, { mint: string; decimals: number }>)[token];
+    const m = new PublicKey(t.mint);
+    const amount = BigInt(Math.round(TOKEN_DRIP[token].units * 10 ** t.decimals));
+    const tx = new Transaction().add(createTransferInstruction(getAssociatedTokenAddressSync(m, signer.publicKey), getAssociatedTokenAddressSync(m, owner), signer.publicKey, amount));
+    tx.feePayer = signer.publicKey;
+    tx.recentBlockhash = body.blockhash;
+    tx.sign(signer);
+    await env.FAUCET.put(key, String(now), { expirationTtl: COOLDOWN_SEC * 2 });
+    return json({ transaction: btoa(String.fromCharCode(...tx.serialize())), amount: String(TOKEN_DRIP[token].units), token });
+  }
+  const mint = new PublicKey(env.TEST_USDC);
   // Since test USDC became a CCIP cross-chain token, its mint authority is a 1-of-2 SPL
   // multisig (the CCIP pool signer and this faucet key): the faucet mints as a member.
   const authority = env.TEST_USDC_MINT_MULTISIG ? new PublicKey(env.TEST_USDC_MINT_MULTISIG) : signer.publicKey;
@@ -139,6 +157,16 @@ export default {
       try { return await ai(req, env); } catch (e) { return json({ kind: 'error', error: e instanceof Error ? e.message : String(e) }, 502); }
     }
     if (url.pathname === '/api/templates' && req.method === 'GET') return listTemplates(env);
+    // CCIP message status (the CCIP explorer's API, which browsers cannot call directly).
+    const ccip = /^\/api\/ccip\/(0x[0-9a-fA-F]{64})$/.exec(url.pathname);
+    if (ccip && req.method === 'GET') {
+      const r = await fetch(`https://ccip.chain.link/api/h/atlas/message/${ccip[1]}`, { headers: { Accept: 'application/json' } });
+      if (!r.ok) return json({ state: null, indexed: false }, 200);
+      const j = await r.json().catch(() => null) as Record<string, unknown> | null;
+      if (!j) return json({ state: null, indexed: false }, 200);
+      const pick = ['messageId', 'state', 'sendTimestamp', 'sendFinalized', 'commitBlockTimestamp', 'receiptTimestamp', 'receiptTransactionHash', 'sourceNetworkName', 'destNetworkName', 'sender', 'receiver', 'sendTransactionHash'];
+      return Response.json({ ...Object.fromEntries(pick.map(k => [k, j[k] ?? null])), indexed: true }, { headers: { 'Cache-Control': 'public, max-age=20' } });
+    }
     if (url.pathname === '/api/templates' && req.method === 'POST') {
       try { return await saveTemplate(req, env); } catch (e) { return json({ error: e instanceof Error ? e.message : String(e) }, 400); }
     }

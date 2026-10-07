@@ -12,7 +12,8 @@ import {
   type Compiled, type Issue, type ProductParams, type Slot, type TemplateSource, type TemplateSummary, type WorkflowIR,
 } from '@stratosnotes/flow';
 import PayoffChart from './PayoffChart';
-import { DEPLOYMENT, explorer } from '../config';
+import { DEPLOYMENT, explorer, TOKENS, type TokenSymbol } from '../config';
+import FaucetButton from './FaucetButton';
 import { useEngine } from '../lib/engine';
 import { FIELD_LABEL, obsIndex, planIssuance, rolesFor } from '../lib/issuance';
 import { fmtMoney, headline, short } from '../lib/offerings';
@@ -262,7 +263,8 @@ export function IssuePanel({ doc, built }: { doc: DocInfo; built: Built | null }
       const definition = await engine.publish(c);
       step('Definition on Solana (shared by every issuance of this workflow).');
       const usdc = new PublicKey(DEPLOYMENT.testUsdc);
-      const mints = ir.assets.map(a => (a.kind === 'cash' ? usdc : PublicKey.default));
+      // Each token asset's mint: tUSD for cash, the deliverable token for a physical underlying.
+      const mints = ir.assets.map(a => (a.kind === 'cash' ? (a.token && a.token in TOKENS ? new PublicKey(TOKENS[a.token as TokenSymbol].solana.mint) : usdc) : PublicKey.default));
       const id = BigInt(Date.now());
       const process = pda.process(definition, publicKey, id);
       await engine.send([
@@ -322,10 +324,13 @@ export function IssuePanel({ doc, built }: { doc: DocInfo; built: Built | null }
           <div className="form-grid">
             {generic.map(f => (
               <div key={f.name} className="field">
-                <label htmlFor={`is-${f.name}`}>{FIELD_LABEL[f.name] ?? f.name} <span className="dim">({KIND_NAME[f.kind]})</span></label>
+                <label htmlFor={`is-${f.name}`}>{FIELD_LABEL[f.name] ?? (f.name.startsWith('deliveryReserve_') ? `${f.name.slice(16)} delivery reserve (t${f.name.slice(16)})` : f.name)} <span className="dim">({KIND_NAME[f.kind]})</span></label>
                 <input id={`is-${f.name}`} type={f.kind === FKIND.Date ? 'datetime-local' : 'text'} value={valueOf(f.name)}
                   onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))} />
                 {f.name === 'reserve' && p && <span className="hint">Worst case above par: {fmtMoney(reserve)} USDC{p.productType === 'ppn' ? ' (sized for a 100% rise)' : ''}.</span>}
+                {f.name.startsWith('deliveryReserve_') && (
+                  <span className="hint">Enough to deliver every unit if knocked in: size ÷ the {f.name.slice(16)} strike, in t{f.name.slice(16)}. Whatever is not delivered stays yours to withdraw. <FaucetButton token={`t${f.name.slice(16)}` as TokenSymbol} /></span>
+                )}
               </div>
             ))}
           </div>

@@ -5,9 +5,11 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { ArrowLeft, Radio } from 'lucide-react';
 import { dec, defToBpmn, instantiateProduct, slot, slotValue, SCALE, toBase } from '@stratosnotes/flow';
 import TasksPanel from '../components/TasksPanel';
+import SepoliaSubscribe from '../components/SepoliaSubscribe';
+import HoldersPanel from '../components/HoldersPanel';
 import BpmnView from '../components/BpmnView';
 import PayoffChart from '../components/PayoffChart';
-import { explorer } from '../config';
+import { explorer, tokenByMint } from '../config';
 import { useEngine } from '../lib/engine';
 import { CASH, fmtDate, fmtMoney, fmtPct, fmtPrice, headline, PHASE_LABEL, position, short, toOffering } from '../lib/offerings';
 import { useNow, useOffering } from '../lib/useOfferings';
@@ -48,6 +50,13 @@ export default function OfferingPage() {
   });
   const withdraw = () => run('Withdrawn to your wallet.', async () =>
     engine.send([await engine.withdraw(o.address, o.definition, CASH, o.process.mints[CASH], toBase(mine!.cashRaw, 6))]));
+  // Delivered tokens (physical settlement), withdrawable like cash.
+  const delivered = publicKey ? o.process.holdings.filter(h => h.owner.equals(publicKey) && h.asset > CASH && h.amount > 0n) : [];
+  const withdrawToken = (asset: number) => run('Withdrawn to your wallet.', async () => {
+    const t = tokenByMint(o.process.mints[asset].toBase58());
+    const amount = o.process.holdings.find(h => h.owner.equals(publicKey!) && h.asset === asset)!.amount;
+    return engine.send([await engine.withdraw(o.address, o.definition, asset, o.process.mints[asset], toBase(amount, t?.solana.decimals ?? o.def.assets[asset].decimals))]);
+  });
 
   const basket = o.unds.length > 1;
   const levels = (k: number) => o.unds.map(u => `${u.symbol} ${fmtPrice(u.observed[k])}`).join(' · ');
@@ -151,9 +160,11 @@ export default function OfferingPage() {
             </section>
           )}
 
+          {o.phase === 'book' && !o.custom && o.stepIndex.Task_Subscribe !== undefined && <SepoliaSubscribe o={o} now={now} onSent={refresh} />}
+
           <TasksPanel o={o} onDone={refresh} hide={o.custom ? [] : ['Task_Subscribe']} />
 
-          {mine && (mine.units > 0 || mine.cash > 0) && (
+          {mine && (mine.units > 0 || mine.cash > 0 || delivered.length > 0) && (
             <section className="card">
               <h3>Your position</h3>
               <div className="kv">
@@ -161,6 +172,15 @@ export default function OfferingPage() {
                 <div><span className="label">Cash to withdraw</span><span className="v">{fmtMoney(mine.cash)}</span></div>
               </div>
               <button className="btn" disabled={busy || !(mine.cash > 0)} onClick={withdraw}>Withdraw USDC</button>
+              {delivered.map(h => {
+                const sym = tokenByMint(o.process.mints[h.asset].toBase58())?.symbol ?? o.def.assets[h.asset].name;
+                return (
+                  <div key={h.asset} className="spread small">
+                    <span>Delivered <span className="num">{(Number(h.amount) / Number(SCALE)).toFixed(6)}</span> {sym}</span>
+                    <button className="btn" disabled={busy} onClick={() => withdrawToken(h.asset)}>Withdraw {sym}</button>
+                  </div>
+                );
+              })}
               {mine.units > 0 && o.phase !== 'redeemed' && (
                 <div className="stack" style={{ gap: 8, borderTop: '1px solid hsl(var(--border))', paddingTop: 10 }}>
                   <span className="label">Transfer notes</span>
@@ -174,6 +194,8 @@ export default function OfferingPage() {
           )}
 
           {msg && <div className={`notice ${msg.kind}`} role="status">{msg.text} {msg.sig && <a href={explorer('tx', msg.sig)} target="_blank" rel="noreferrer">View transaction</a>}</div>}
+
+          <HoldersPanel o={o} onDone={refresh} />
 
           {o.custom && (
             <section className="card">

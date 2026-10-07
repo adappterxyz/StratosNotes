@@ -69,6 +69,18 @@ export function ProductForm({ p, set }: { p: ProductParams; set: (patch: Partial
       {use.autocall && <NumField id="pd-ac" label="Autocall level %" value={p.autocallLevelPct} onChange={v => set({ autocallLevelPct: v })} />}
       {use.autocall && <NumField id="pd-acf" label="Autocall from observation" value={p.autocallFromPeriod ?? 1} step="1" onChange={v => set({ autocallFromPeriod: v })} />}
       {use.knockIn && <NumField id="pd-ki" label="Knock-in barrier %" value={p.knockInBarrierPct} onChange={v => set({ knockInBarrierPct: v })} hint="Below it: final / strike in cash" />}
+      {use.knockIn && (
+        <div className="field">
+          <label htmlFor="pd-settle">Settlement below the barrier</label>
+          <select id="pd-settle" value={p.settlement ?? 'cash'} onChange={e => set({ settlement: e.target.value as 'cash' | 'physical' })}>
+            <option value="cash">Cash (USDC)</option>
+            <option value="physical">Physical delivery</option>
+          </select>
+          <span className="hint">{p.settlement === 'physical'
+            ? `Holders receive units ÷ strike of ${p.underlyings.length > 1 ? 'the worst performer\'s' : `the ${p.underlyings[0]?.symbol}`} token (t${p.underlyings.length > 1 ? 'ETH/tBTC/tSOL' : p.underlyings[0]?.symbol}); the issuer deposits a delivery reserve at issue.`
+            : 'Holders receive final ÷ strike in USDC.'}</span>
+        </div>
+      )}
       {use.protection && <NumField id="pd-prot" label="Protection %" value={p.protectionPct} onChange={v => set({ protectionPct: v })} />}
       {use.protection && <NumField id="pd-part" label="Participation %" value={p.participationPct} onChange={v => set({ participationPct: v })} />}
     </div>

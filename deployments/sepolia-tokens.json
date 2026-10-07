@@ -18,5 +18,6 @@
     "token": "0x1f0a3b0a7c4d86b2311d1acbeeb4b40c717cca3d",
     "decimals": 9,
     "pool": "0x4d626a50fc94e591328facebcbb58eea22cc5203"
-  }
+  },
+  "faucet": "0xe29372095e3695a727881707912a266c920e1d1e"
 }

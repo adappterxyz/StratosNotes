@@ -155,6 +155,7 @@ export function headline(o: ProductParams) {
   if (o.autocallLevelPct) parts.push(`autocall ${o.autocallLevelPct}%`);
   if (o.knockInBarrierPct) parts.push(`knock-in ${o.knockInBarrierPct}%`);
   if (o.protectionPct) parts.push(`${o.protectionPct}% protected, ${o.participationPct}% participation`);
+  if (o.settlement === 'physical') parts.push('physical delivery');
   return parts.join(' · ');
 }
 
