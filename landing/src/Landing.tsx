@@ -201,7 +201,7 @@ export default function Landing() {
             <div className="section-head" data-reveal>
               <span className="eyebrow">Demo · 2 min</span>
               <h2>From a template to a live note,<br /><span className="grad-text">in one sitting.</span></h2>
-              <p>The BPMN workflow behind a note, issuing it with this issuance's terms, an investor subscribing, and Chainlink CRE fixing the strike and observing on Solana devnet.</p>
+              <p>The BPMN workflow behind a note, issuing it with this issuance's terms, an investor subscribing, and Chainlink CRE fixing the strike, observing, and autocalling it with a 5% payout, all on Solana devnet.</p>
             </div>
             <div className="demo-frame" data-reveal data-reveal-d="1">
               <video controls playsInline preload="metadata" poster="/demo-poster.jpg" aria-label="StratosNotes demo video">

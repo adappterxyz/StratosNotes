@@ -197,7 +197,8 @@ text(s, M, Inches(6.35), Inches(8), Inches(0.35),
 PUBLIC = Path(__file__).resolve().parents[2] / "landing" / "public"
 s = slide(
     "Play the two-minute demo: the BPMN workflow behind a note, issuing it with this issuance's terms, an "
-    "investor subscribing, and Chainlink CRE fixing the strike and observing on Solana devnet. "
+    "investor subscribing 100 units, and Chainlink CRE fixing the strike, observing twice and autocalling the note: "
+    "105 USDC back for 100 invested, on Solana devnet. "
     "Also online at sp.stratoslab.app/#demo."
 )
 title(s, "Two minutes, template to live note", kicker="Demo")
