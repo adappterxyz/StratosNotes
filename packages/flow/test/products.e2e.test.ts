@@ -11,7 +11,7 @@ import { ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
 const CU: number[] = [];
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import {
-  compile, compileTemplate, dec, encodeReport, SEED_TEMPLATES, type TemplateSource, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, FEEDS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
+  compile, compileTemplate, dec, encodeReport, SEED_TEMPLATES, type TemplateSource, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, FEEDS, DELIVERABLE, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
   parseBpmn, pda, reservePerUnit, simulateWorstOf, slot, toBase, totalPerUnit, SCALE, type ProductParams, type ProductType,
 } from '../src';
 import { e2eAdmin } from './e2e-admin';
@@ -42,6 +42,8 @@ interface Run {
 }
 const seed = (part: string) => SEED_TEMPLATES.find(t => t.name.includes(part))!.source;
 const ETH_BTC: ProductParams = { ...EXAMPLE_PRODUCTS.fcn, name: '12M Worst-of FCN on ETH, BTC', underlyings: [FEEDS.ETH, FEEDS.BTC] };
+const PHYS_ETH: ProductParams = { ...EXAMPLE_PRODUCTS.fcn, name: '12M FCN on ETH, physical', settlement: 'physical' };
+const PHYS_BASKET: ProductParams = { ...EXAMPLE_PRODUCTS['reverse-convertible'], name: '12M Worst-of RC on ETH, BTC, SOL, physical', underlyings: [FEEDS.ETH, FEEDS.BTC, FEEDS.SOL], settlement: 'physical' };
 const RUNS: Run[] = [
   { type: 'fcn', path: [90, 104, 0, 0], investors: [600, 400] }, // autocalled at 2
   { type: 'fcn', path: [90, 95, 80, 50], investors: [700, 300] }, // knocked in: cash-settled at 0.5
@@ -56,6 +58,9 @@ const RUNS: Run[] = [
   // Seed templates (custom workflows). Step-down: 96% at Q3 calls (level 95%), where the stock phoenix would not.
   { type: 'phoenix', source: seed('Step-down'), params: seed('Step-down').basis, path: [80, 90, 96, 0], investors: [500, 500], perUnit: 1.075 },
   // Servicing fee: investors get the plain phoenix payoff; the paying agent collects 0.1% of 1,000 with each of the 2 coupons paid.
+  // Physical delivery: knocked in, each holder receives units / strike of ETH (single) or of the worst performer (SOL here).
+  { type: 'fcn', params: PHYS_ETH, path: [90, 95, 80, 50], investors: [700, 300] },
+  { type: 'reverse-convertible', params: PHYS_BASKET, path: [[95, 90, 92], [90, 85, 80], [80, 99, 75], [90, 95, 55]], investors: [400, 600] },
   { type: 'phoenix', source: seed('servicing fee'), params: seed('servicing fee').basis, path: [60, 65, 80, 75], investors: [500, 500], paFee: 2 },
 ];
 const paramsOf = (r: Run) => r.params ?? EXAMPLE_PRODUCTS[r.type];
@@ -63,6 +68,7 @@ const rows = (r: Run) => (r.path as Array<number | number[]>).map(x => (Array.is
 
 describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
   let admin: Keypair, usdc: PublicKey, forwarderState: Keypair;
+  const tokenMints: Record<string, PublicKey> = {};
   const MOCK_ID = new PublicKey((MOCK_FORWARDER_IDL as { address: string }).address);
 
   beforeAll(async () => {
@@ -73,6 +79,7 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
     const mock = new Program(MOCK_FORWARDER_IDL, provider(admin));
     await mock.methods.initState().accounts({ state: forwarderState.publicKey, payer: admin.publicKey }).signers([forwarderState]).rpc();
     usdc = await createMint(conn, admin, admin.publicKey, null, 6);
+    for (const d of Object.values(DELIVERABLE)) tokenMints[d.token] = await createMint(conn, admin, admin.publicKey, null, d.decimals);
   }, 120000);
 
   /** What CRE does on devnet: a report through the forwarder into on_report. */
@@ -116,6 +123,9 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
         const ata = await getOrCreateAssociatedTokenAccount(conn, admin, usdc, kp.publicKey);
         await mintTo(conn, admin, usdc, ata.address, admin, BigInt(units) * 1_000_000n);
       };
+      // One mint per token asset: USDC for cash, the deliverable token for each physical underlying.
+      const assets = (run.source ? null : instantiateProduct(p).assets) ?? [];
+      const mints = c.def.assets.map((a, i) => (a.kind === 0 ? PublicKey.default : assets[i]?.token && assets[i].token !== 'tUSD' ? tokenMints[assets[i].token!] : usdc));
       await mintCash(issuerKp, reserve + (run.source ? notional / 100 : 0)); // custom templates may deposit more (e.g. fees)
 
       // Issuer: start, pre-trade terms (size, dates, reserve deposit), mandate.
@@ -125,16 +135,27 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
       const strikeAt = t0 + 30;
       const obsAt = Array.from({ length: p.observations }, (_, k) => strikeAt + 5 * (k + 1));
       await issuer.send([
-        await issuer.startProcess(definition, id, [issuerKp.publicKey, paKp.publicKey, OPEN_ROLE], [PublicKey.default, usdc], c.stepIndex.Start_Issuer),
-        await issuer.openVault(process, CASH, usdc),
+        await issuer.startProcess(definition, id, [issuerKp.publicKey, paKp.publicKey, OPEN_ROLE], mints, c.stepIndex.Start_Issuer),
+        ...await Promise.all(mints.map((m, i) => (m.equals(PublicKey.default) ? null : issuer.openVault(process, i, m))).filter(Boolean) as Promise<import('@solana/web3.js').TransactionInstruction>[]),
       ]);
+      // Physical delivery: the issuer deposits enough of each token for every unit at its strike, plus 10%.
+      const reserveSteps = p.settlement === 'physical' ? p.underlyings.map((u, i) => ({ u, i, step: c.stepIndex[`Task_DeliveryReserve_${u.symbol}`], asset: c.def.assets.findIndex(a => a.name === DELIVERABLE[u.symbol].token) })) : [];
+      for (const r of reserveSteps) {
+        const tm = mints[r.asset];
+        const amount = Math.ceil(notional / strikes[r.i] * 1.1 * 1e4) / 1e4;
+        await mintTo(conn, admin, tm, (await getOrCreateAssociatedTokenAccount(conn, admin, tm, issuerKp.publicKey)).address, admin, BigInt(Math.ceil(amount * 10 ** DELIVERABLE[r.u.symbol].decimals)));
+        (r as { amount?: number }).amount = amount;
+      }
       await issuer.send([
         await issuer.executeStep(process, definition, c.stepIndex.Task_ApproveTerms, [
           slot.text(`XS${String(idx).padStart(10, '0')}`), slot.number(dec(notional)), slot.number(BigInt(strikeAt)),
           ...obsAt.map(t => slot.number(BigInt(t))), slot.number(dec(reserve)),
         ], { deposit: { asset: CASH, mint: usdc } }),
-        await issuer.executeStep(process, definition, c.stepIndex.Task_Mandate, []),
       ]);
+      for (const r of reserveSteps) {
+        await issuer.send([await issuer.executeStep(process, definition, r.step, [slot.number(dec((r as { amount?: number }).amount!))], { deposit: { asset: r.asset, mint: mints[r.asset] } })]);
+      }
+      await issuer.send([await issuer.executeStep(process, definition, c.stepIndex.Task_Mandate, [])]);
 
       // Marketplace: two investors subscribe from the open book.
       const investors = await Promise.all(run.investors.map(async units => {
@@ -175,17 +196,29 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
         const bal = (await getAccount(conn, getAssociatedTokenAddressSync(usdc, inv.kp.publicKey))).amount;
         return { units: inv.units, owed, wallet: bal };
       }));
+      // Delivered tokens per holder (physical settlement).
+      const delivered = investors.map(inv => Object.fromEntries(final.holdings.filter(h => h.owner.equals(inv.kp.publicKey) && h.asset > CASH).map(h => [c.def.assets[h.asset].name, Number(h.amount) / Number(SCALE)])));
       const paCash = Number(final.holdings.find(h => h.owner.equals(paKp.publicKey) && h.asset === CASH)?.amount ?? 0n) / Number(SCALE);
-      return { run, final, ref, paid, paCash };
+      return { run, final, ref, paid, paCash, delivered, strikes };
     }));
 
     console.log(`report compute units: max ${Math.max(...CU)}, mean ${Math.round(CU.reduce((a, b) => a + b, 0) / CU.length)} over ${CU.length} reports`);
     expect(Math.max(...CU)).toBeLessThan(300_000); // CRE's cap for a Solana write
-    for (const { run, final, ref, paid, paCash } of results) {
+    for (const { run, final, ref, paid, paCash, delivered, strikes } of results) {
       expect(final.status, `${run.type} ${run.path} completed`).toBe(1);
       expect(paCash, `${paramsOf(run).name}: paying agent fees`).toBeCloseTo(run.paFee ?? 0, 6);
+      const p = paramsOf(run);
+      // Physical and knocked in: coupons in cash; the redemption in the worst performer's token, units / its strike.
+      const knocked = p.settlement === 'physical' && !ref.calledAt && ref.redemptionCash < 1;
+      const last = rows(run)[p.observations - 1];
+      const worst = last.map((x, i) => x / 100).indexOf(Math.min(...last.map(x => x / 100)));
+      paid.forEach((x, k) => {
+        if (!knocked) { expect(Object.keys(delivered[k]), `${p.name}: nothing delivered`).toEqual([]); return; }
+        const token = DELIVERABLE[p.underlyings[worst].symbol].token;
+        expect(delivered[k][token], `${p.name}: ${x.units} units deliver ${token}`).toBeCloseTo(x.units / strikes[worst], 6);
+      });
       for (const x of paid) {
-        const expected = x.units * (run.perUnit ?? totalPerUnit(ref));
+        const expected = x.units * (run.perUnit ?? (knocked ? ref.coupons.reduce((a, b) => a + b, 0) : totalPerUnit(ref)));
         expect(Number(x.owed) / Number(SCALE), `${run.type} ${run.path}: ${x.units} units`).toBeCloseTo(expected, 6);
         expect(Number(x.wallet) / 1e6, `${run.type}: withdrawn as USDC`).toBeCloseTo(expected, 5);
       }

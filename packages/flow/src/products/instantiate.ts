@@ -23,7 +23,7 @@
  */
 import { buildWorkflow, chain, field, type BuiltWorkflow, type SpecFlow, type SpecNode } from '../bpmn';
 import type { AssetDefinition, AssetOperation, NodeProps } from '../types';
-import { PRODUCT_LABELS, productUses, underlyingLabel, validateProductParams, type ProductParams, type Underlying } from './params';
+import { CASH_TOKEN, DELIVERABLE, PRODUCT_LABELS, productUses, underlyingLabel, validateProductParams, type ProductParams, type Underlying } from './params';
 
 export const ISSUER = 'Issuer';
 export const PA = 'Paying Agent';
@@ -49,12 +49,15 @@ export function instantiateProduct(p: ProductParams): InstantiatedProduct {
   const use = productUses(p.productType);
   const n = p.observations;
 
+  const physical = p.settlement === 'physical';
   const assets: AssetDefinition[] = [
     { id: 'note', name: 'Note', kind: 'issued' },
-    { id: 'cash', name: 'USDC', kind: 'cash', decimals: 6 },
+    { id: 'cash', name: 'USDC', kind: 'cash', decimals: CASH_TOKEN.decimals, token: CASH_TOKEN.token },
+    // Physical delivery: each underlying's token, delivered below the knock-in barrier.
+    ...(physical ? p.underlyings.map(u => ({ id: `d_${u.symbol}`, name: DELIVERABLE[u.symbol].token, kind: 'cash' as const, decimals: DELIVERABLE[u.symbol].decimals, token: DELIVERABLE[u.symbol].token })) : []),
   ];
-  const distribute = (perUnit: string, retire = false): AssetOperation => ({
-    assetId: 'cash', operation: 'distribute',
+  const distribute = (perUnit: string, retire = false, assetId = 'cash'): AssetOperation => ({
+    assetId, operation: 'distribute',
     params: { holdingAssetId: 'note', payer: ISSUER, amountSource: 'expr', amountExpr: perUnit, ...(retire ? { retire: true } : {}) },
   });
   const oracleField = (name: string, u: Underlying) => field(name, 'Decimal', {
@@ -176,14 +179,39 @@ export function instantiateProduct(p: ProductParams): InstantiatedProduct {
     const gw = 'GW_KnockIn';
     nodes.push({ id: gw, type: 'exclusiveGateway', name: 'Above knock-in barrier?', col });
     nodes.push({ id: 'Task_RedeemPar', type: 'serviceTask', name: 'Redeem at Par', col: col + 1, props: { assetOperation: distribute('1', true) } });
-    nodes.push({ id: 'Task_KnockIn', type: 'serviceTask', name: 'Cash-Settle Below Barrier', col: col + 1, row: 1, props: { assetOperation: distribute(ratio(n), true) } });
     end('End_Par', 'Redeemed at par', col + 2);
-    end('End_KnockedIn', 'Redeemed (knocked in)', col + 2, 1);
     linkPrev(gw);
     flow(gw, 'Task_RedeemPar', { name: 'At or above barrier', cond: atLeast(n, p.knockInBarrierPct!) });
-    flow(gw, 'Task_KnockIn', { name: 'Knocked in', isDefault: true });
     flow('Task_RedeemPar', 'End_Par');
-    flow('Task_KnockIn', 'End_KnockedIn');
+    // Each holder gets units / strike of an underlying's token (face 1 USDC per unit).
+    const deliver = (u: Underlying, id: string, c: number, row: number) => nodes.push({
+      id, type: 'serviceTask', name: `Deliver ${u.symbol} Below Barrier`, col: c, row,
+      props: { assetOperation: distribute(basket ? `1 / initialLevel_${u.symbol}` : '1 / initialLevel', true, `d_${u.symbol}`) },
+    });
+    if (!physical) {
+      nodes.push({ id: 'Task_KnockIn', type: 'serviceTask', name: 'Cash-Settle Below Barrier', col: col + 1, row: 1, props: { assetOperation: distribute(ratio(n), true) } });
+      end('End_KnockedIn', 'Redeemed (knocked in)', col + 2, 1);
+      flow(gw, 'Task_KnockIn', { name: 'Knocked in', isDefault: true });
+      flow('Task_KnockIn', 'End_KnockedIn');
+    } else if (!basket) {
+      deliver(unds[0], 'Task_KnockIn', col + 1, 1);
+      end('End_KnockedIn', 'Delivered (knocked in)', col + 2, 1);
+      flow(gw, 'Task_KnockIn', { name: 'Knocked in', isDefault: true });
+      flow('Task_KnockIn', 'End_KnockedIn');
+    } else {
+      // The worst performer is the one whose ratio equals perfN (same on-chain arithmetic, so exact).
+      const worst = 'GW_Worst';
+      nodes.push({ id: worst, type: 'exclusiveGateway', name: 'Which is the worst performer?', col: col + 1, row: 1 });
+      flow(gw, worst, { name: 'Knocked in', isDefault: true });
+      unds.forEach((u, i) => {
+        const id = `Task_Deliver_${u.symbol}`;
+        deliver(u, id, col + 2, 1 + i);
+        const last = i === unds.length - 1;
+        flow(worst, id, last ? { name: `${u.symbol} worst`, isDefault: true } : { name: `${u.symbol} worst`, cond: `perf${n} == obs${n}_${u.symbol} / initialLevel_${u.symbol}` });
+        flow(id, 'End_KnockedIn');
+      });
+      end('End_KnockedIn', 'Delivered (knocked in)', col + 3, 1);
+    }
   }
 
   const label = PRODUCT_LABELS[p.productType];
@@ -194,6 +222,13 @@ export function instantiateProduct(p: ProductParams): InstantiatedProduct {
     ...Array.from({ length: n }, (_, i) => field(obsDate(i + 1), 'Date')),
     field('reserve', 'Decimal'),
   ];
+  const reserveSteps = physical ? unds.map(u => ({
+    id: `Task_DeliveryReserve_${u.symbol}`, token: DELIVERABLE[u.symbol].token,
+    props: {
+      templateFields: [field(`deliveryReserve_${u.symbol}`, 'Decimal')],
+      assetOperation: { assetId: `d_${u.symbol}`, operation: 'deposit' as const, params: { amountSource: 'field' as const, amountField: `deliveryReserve_${u.symbol}` } },
+    },
+  })) : [];
   const built = buildWorkflow({
     key: 'SP',
     name: p.name,
@@ -202,9 +237,11 @@ export function instantiateProduct(p: ProductParams): InstantiatedProduct {
         { id: 'Start_Issuer', type: 'startEvent', name: 'Offer Drafted', col: 0 },
         // Pre-trade: this issuance's size, dates and coupon reserve (deposited now).
         { id: 'Task_ApproveTerms', type: 'userTask', name: 'Approve Terms', col: 1, props: { templateFields: pretrade, assetOperation: { assetId: 'cash', operation: 'deposit', params: { amountSource: 'field', amountField: 'reserve' } } } },
-        { id: 'Task_Mandate', type: 'userTask', name: 'Mandate Paying Agent', col: 2 },
-        { id: 'End_Issuer', type: 'endEvent', name: 'Mandated', col: 3 },
-      ], flows: chain('I_F', 'Start_Issuer', 'Task_ApproveTerms', 'Task_Mandate', 'End_Issuer') },
+        // Physical delivery: one deposit step per deliverable token (a step takes one deposit).
+        ...reserveSteps.map((r, i) => ({ id: r.id, type: 'userTask' as const, name: `Deposit ${r.token} Delivery Reserve`, col: 2 + i, props: r.props })),
+        { id: 'Task_Mandate', type: 'userTask', name: 'Mandate Paying Agent', col: 2 + reserveSteps.length },
+        { id: 'End_Issuer', type: 'endEvent', name: 'Mandated', col: 3 + reserveSteps.length },
+      ], flows: chain('I_F', 'Start_Issuer', 'Task_ApproveTerms', ...reserveSteps.map(r => r.id), 'Task_Mandate', 'End_Issuer') },
       { id: 'Part_PayingAgent', name: PA, proc: 'Proc_PayingAgent', nodes, flows },
       { id: 'Part_Investor', name: INVESTOR, proc: 'Proc_Investor', nodes: [
         { id: 'Recv_Offer', type: 'receiveTask', name: 'Offer Listed', col: 4 },

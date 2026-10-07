@@ -10,7 +10,7 @@ import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/s
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { compile, dec, Engine, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, instantiateProduct, OPEN_ROLE, parseBpmn, pda, reservePerUnit, slot, type ProductType } from '../src';
+import { CCIP, ccipPda, ENGINE_PROGRAM_ID, compile, dec, Engine, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, instantiateProduct, OPEN_ROLE, parseBpmn, pda, reservePerUnit, slot, type ProductType } from '../src';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const OUT = join(ROOT, 'deployments/devnet.json');
@@ -62,14 +62,19 @@ async function issue(type: ProductType | 'worst-of') {
   const issuer = engineFor(payer);
   const definition = await issuer.publish(c);
   const units = [600, 400];
-  const notional = units.reduce((a, b) => a + b, 0);
+  // EXTRA_UNITS: left unsold at issue, e.g. for an investor subscribing from Sepolia over CCIP.
+  const notional = units.reduce((a, b) => a + b, 0) + Number(process.env.EXTRA_UNITS ?? 0);
   const reserve = Math.ceil(notional * (reservePerUnit(p) ?? (p.participationPct ?? 0) / 100));
   // The faucet key holds the test mint's authority once it has been handed over.
   const faucetPath = join(KEYS, 'faucet.json');
   const minter = existsSync(faucetPath) ? loadKp(faucetPath) : payer;
   const cash = async (owner: PublicKey, n: number) => {
     const ata = await getOrCreateAssociatedTokenAccount(conn, payer, usdc, owner);
-    await mintTo(conn, payer, usdc, ata.address, minter, BigInt(n) * 1_000_000n);
+    // Test USDC is a CCIP cross-chain token: its mint authority is a 1-of-2 SPL multisig
+    // (CCIP pool signer, faucet key); the faucet key mints as a member.
+    const multisig = (() => { try { return new PublicKey(JSON.parse(readFileSync(join(ROOT, 'deployments/solana-tokens.json'), 'utf8')).tUSD.multisig); } catch { return null; } })();
+    if (multisig) await mintTo(conn, payer, usdc, ata.address, multisig, BigInt(n) * 1_000_000n, [minter]);
+    else await mintTo(conn, payer, usdc, ata.address, minter, BigInt(n) * 1_000_000n);
   };
   await cash(payer.publicKey, reserve);
 
@@ -114,8 +119,33 @@ async function transfer(processAddr: string, from: string, to: string, units: nu
   console.log(`${from} -> ${to}: ${units} units (${buyer.publicKey.toBase58()})`);
 }
 
+/**
+ * CCIP: point the engine at Chainlink's devnet router with Sepolia as the
+ * accepted chain, and create the engine's inbox (inbound tokens) and sender
+ * (outbound) token accounts for every cross-chain token.
+ */
+async function ccip() {
+  const s = state();
+  const tokens = JSON.parse(readFileSync(join(ROOT, 'deployments/solana-tokens.json'), 'utf8')) as Record<string, { mint: string }>;
+  const e = engineFor(payer);
+  await e.send([await e.setCcip(CCIP.devnet.router, [CCIP.sepolia.selector])]);
+  const inbox = ccipPda.inbox(ENGINE_PROGRAM_ID), sender = ccipPda.sender(ENGINE_PROGRAM_ID);
+  const accounts: Record<string, { inbox: string; sender: string }> = {};
+  for (const [sym, t] of Object.entries(tokens)) {
+    const mint = new PublicKey(t.mint);
+    accounts[sym] = {
+      inbox: (await getOrCreateAssociatedTokenAccount(conn, payer, mint, inbox, true)).address.toBase58(),
+      sender: (await getOrCreateAssociatedTokenAccount(conn, payer, mint, sender, true)).address.toBase58(),
+    };
+  }
+  s.ccip = { router: CCIP.devnet.router.toBase58(), chains: { sepolia: CCIP.sepolia.selector.toString() }, inbox: inbox.toBase58(), sender: sender.toBase58(), tokenAccounts: accounts };
+  save(s);
+  console.log(JSON.stringify(s.ccip, null, 2));
+}
+
 const [cmd, arg] = process.argv.slice(2);
 if (cmd === 'init') await init();
 else if (cmd === 'issue') await issue((arg as ProductType | 'worst-of') ?? 'fcn');
+else if (cmd === 'ccip') await ccip();
 else if (cmd === 'transfer') await transfer(arg, process.argv[4], process.argv[5], Number(process.argv[6]));
 else console.log('usage: devnet.ts init | issue [fcn|reverse-convertible|phoenix|snowball|ppn]');

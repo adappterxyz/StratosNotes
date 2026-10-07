@@ -77,6 +77,12 @@ export interface AssetDefinition {
   kind: 'issued' | 'cash';
   /** cash: the SPL token's decimals (USDC: 6). */
   decimals?: number;
+  /**
+   * cash: which cross-chain token this is (a symbol in deployments/*-tokens.json,
+   * e.g. tUSD, tETH), so an app can map it to its mint on Solana and its
+   * address on other CCIP chains. Not part of the compiled definition.
+   */
+  token?: string;
 }
 
 export type NodeType =

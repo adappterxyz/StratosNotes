@@ -35,6 +35,12 @@ export interface ProductParams {
   issuePricePct: number;
   /** One underlying, or a worst-of basket (up to MAX_UNDERLYINGS). */
   underlyings: Underlying[];
+  /**
+   * Below the knock-in barrier: `cash` pays final / strike in USDC; `physical`
+   * delivers units / strike of the (worst) underlying's token instead, from a
+   * delivery reserve the issuer deposits at pre-trade. Default cash.
+   */
+  settlement?: 'cash' | 'physical';
   /** Number of observations per issuance; the last one is maturity. Dates are set per issuance at pre-trade. */
   observations: number;
   couponRatePct?: number;
@@ -108,6 +114,10 @@ export function validateProductParams(p: ProductParams): string[] {
     if (use.autocall && Number(p.knockInBarrierPct) >= Number(p.autocallLevelPct)) e.push('The knock-in barrier must be below the autocall level.');
     if (use.couponBarrier && Number(p.knockInBarrierPct) > Number(p.couponBarrierPct)) e.push('The knock-in barrier must not be above the coupon barrier.');
   }
+  if (p.settlement === 'physical') {
+    if (!use.knockIn) e.push('Physical delivery applies below a knock-in barrier: this payoff has none.');
+    for (const u of unds) if (!DELIVERABLE[u.symbol]) e.push(`There is no deliverable token for ${u.symbol}.`);
+  }
   if (use.protection) {
     if (!(Number(p.protectionPct) > 0 && Number(p.protectionPct) <= 100)) e.push('Protection must be between 0 and 100% of face.');
     if (!(Number(p.participationPct) >= 0)) e.push('Participation must be zero or positive.');
@@ -122,6 +132,14 @@ export function reservePerUnit(p: ProductParams): number | null {
   if (p.productType === 'snowball') return r * p.observations;
   return r * p.observations;
 }
+
+/** Cross-chain tokens (CCIP, Solana devnet <-> Sepolia): cash and each underlying's deliverable token. */
+export const CASH_TOKEN = { token: 'tUSD', decimals: 6 };
+export const DELIVERABLE: Record<string, { token: string; decimals: number }> = {
+  ETH: { token: 'tETH', decimals: 9 },
+  BTC: { token: 'tBTC', decimals: 8 },
+  SOL: { token: 'tSOL', decimals: 9 },
+};
 
 // Chainlink price feeds on Ethereum mainnet (8 decimals), with their heartbeats:
 // ETH/USD and BTC/USD update at least hourly, SOL/USD at least daily.
