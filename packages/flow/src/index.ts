@@ -9,6 +9,7 @@ export * from './products/payoff';
 export * from './products/instantiate';
 export * from './products/library';
 export * from './client/engine';
+export * from './client/ccip';
 export * from './validate';
 export * from './draft';
 export * from './defview';

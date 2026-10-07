@@ -8,6 +8,82 @@
   },
   "instructions": [
     {
+      "name": "ccip_send",
+      "docs": [
+        "CCIP router `ccip_send` (same discriminator, arguments and fixed accounts).",
+        "Accounts used: [3] authority (signer, pays `FEE` lamports to [8]), [9] fee-billing",
+        "signer (this program's PDA, the token delegate), [18] the authority's token",
+        "account; the tokens go to the last remaining account (a sink for tests)."
+      ],
+      "discriminator": [
+        108,
+        216,
+        134,
+        191,
+        249,
+        234,
+        33,
+        84
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "dest_chain_selector",
+          "type": "u64"
+        },
+        {
+          "name": "message",
+          "type": {
+            "defined": {
+              "name": "SVM2AnyMessage"
+            }
+          }
+        },
+        {
+          "name": "token_indexes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "deliver",
+      "docs": [
+        "CCIP offramp: call `receiver`'s ccip_receive with `message` (Borsh Any2SVMMessage).",
+        "Remaining accounts: the receiver's accounts (listed in the message's extra args)."
+      ],
+      "discriminator": [
+        250,
+        131,
+        222,
+        57,
+        211,
+        229,
+        209,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "authority"
+        },
+        {
+          "name": "this_program",
+          "address": "E5yD9T1GUpnrkWqiDgmqQVq621Ydc4LSnhrcnYwTuNoX"
+        },
+        {
+          "name": "allowed_offramp"
+        },
+        {
+          "name": "receiver"
+        }
+      ],
+      "args": [
+        {
+          "name": "message",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
       "name": "forward",
       "docs": [
         "Deliver `report` to `receiver`'s on_report; remaining accounts are the receiver's."
@@ -45,6 +121,108 @@
       ]
     },
     {
+      "name": "init_allowed_offramp",
+      "docs": [
+        "CCIP router: allow this program as the offramp for `selector`."
+      ],
+      "discriminator": [
+        44,
+        165,
+        6,
+        229,
+        196,
+        213,
+        25,
+        57
+      ],
+      "accounts": [
+        {
+          "name": "allowed_offramp",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  108,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  111,
+                  102,
+                  102,
+                  114,
+                  97,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "selector"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  194,
+                  109,
+                  207,
+                  56,
+                  181,
+                  187,
+                  218,
+                  90,
+                  161,
+                  8,
+                  129,
+                  253,
+                  249,
+                  15,
+                  228,
+                  217,
+                  153,
+                  11,
+                  14,
+                  192,
+                  253,
+                  220,
+                  64,
+                  56,
+                  215,
+                  128,
+                  128,
+                  235,
+                  157,
+                  34,
+                  33,
+                  62
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_selector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "init_state",
       "discriminator": [
         124,
@@ -77,6 +255,19 @@
   ],
   "accounts": [
     {
+      "name": "AllowedOfframp",
+      "discriminator": [
+        247,
+        97,
+        179,
+        16,
+        207,
+        36,
+        236,
+        132
+      ]
+    },
+    {
       "name": "ForwarderState",
       "discriminator": [
         211,
@@ -90,12 +281,119 @@
       ]
     }
   ],
+  "events": [
+    {
+      "name": "MockCcipSent",
+      "discriminator": [
+        120,
+        211,
+        186,
+        92,
+        91,
+        168,
+        91,
+        255
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "BadSend",
+      "msg": "ccip_send accounts or arguments do not have the router's shape"
+    }
+  ],
   "types": [
+    {
+      "name": "AllowedOfframp",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
     {
       "name": "ForwarderState",
       "type": {
         "kind": "struct",
         "fields": []
+      }
+    },
+    {
+      "name": "MockCcipSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "extra_args",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVM2AnyMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVMTokenAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "fee_token",
+            "type": "pubkey"
+          },
+          {
+            "name": "extra_args",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
       }
     }
   ]

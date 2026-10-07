@@ -64,4 +64,16 @@ pub enum EngineError {
     NotCash,
     #[msg("Only note units (issued assets) can be transferred; withdraw cash instead")]
     NotTransferable,
+    #[msg("The CCIP message did not come through an offramp the CCIP router allows, or from an accepted chain")]
+    UntrustedCcip,
+    #[msg("The CCIP message does not decode, or carries more than one token")]
+    BadCcipMessage,
+    #[msg("The token is not an asset of this process")]
+    UnknownMint,
+    #[msg("Not a remote (cross-chain) holder")]
+    NotRemote,
+    #[msg("CCIP accounts are missing or do not match")]
+    BadCcipAccounts,
+    #[msg("Nothing to send")]
+    NothingToSend,
 }

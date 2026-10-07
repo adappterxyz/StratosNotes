@@ -14,6 +14,7 @@ import {
   compile, compileTemplate, dec, encodeReport, SEED_TEMPLATES, type TemplateSource, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, FEEDS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
   parseBpmn, pda, reservePerUnit, simulateWorstOf, slot, toBase, totalPerUnit, SCALE, type ProductParams, type ProductType,
 } from '../src';
+import { e2eAdmin } from './e2e-admin';
 
 const RPC = process.env.E2E_RPC;
 const conn = RPC ? new Connection(RPC, 'confirmed') : (null as unknown as Connection);
@@ -65,9 +66,9 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
   const MOCK_ID = new PublicKey((MOCK_FORWARDER_IDL as { address: string }).address);
 
   beforeAll(async () => {
-    admin = await funded();
+    admin = await e2eAdmin(conn);
     const eng = new Engine(provider(admin));
-    await eng.send([await eng.initConfig([MOCK_ID])]);
+    if (!(await conn.getAccountInfo(pda.config()))) await eng.send([await eng.initConfig([MOCK_ID])]);
     forwarderState = Keypair.generate();
     const mock = new Program(MOCK_FORWARDER_IDL, provider(admin));
     await mock.methods.initState().accounts({ state: forwarderState.publicKey, payer: admin.publicKey }).signers([forwarderState]).rpc();

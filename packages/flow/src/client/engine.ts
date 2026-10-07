@@ -160,6 +160,27 @@ export class Engine {
     return this.program.methods.transferUnits(asset, to, new BN(amount.toString())).accountsPartial({ process, definition, signer: this.wallet }).instruction();
   }
 
+  /** Admin: the CCIP router whose offramps may deliver, and the accepted chains (selectors). */
+  setCcip(router: PublicKey, chains: bigint[]) {
+    return this.program.methods.setCcip(router, chains.map(c => new BN(c.toString()))).accounts({ admin: this.wallet }).instruction();
+  }
+
+  /**
+   * Send a remote holder's balance of a token asset to its chain over CCIP.
+   * `routerAccounts`: ccipSendAccounts(...) (the router's accounts, then the router).
+   */
+  withdrawRemote(process: PublicKey, definition: PublicKey, holder: PublicKey, asset: number, mint: PublicKey, feeLamports: bigint, routerAccounts: import('@solana/web3.js').AccountMeta[]) {
+    const sender = PublicKey.findProgramAddressSync([new TextEncoder().encode('ccip_sender')], ENGINE_PROGRAM_ID)[0];
+    return this.program.methods.withdrawRemote(holder, asset, new BN(feeLamports.toString()))
+      .accountsPartial({
+        process, definition, payer: this.wallet, sender,
+        senderToken: getAssociatedTokenAddressSync(mint, sender, true),
+        vault: pda.vault(process, asset), mint, tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .remainingAccounts(routerAccounts)
+      .instruction();
+  }
+
   async definition(address: PublicKey) {
     const d = await this.program.account.definition.fetch(address) as { sealed: boolean; data: Buffer; hash: number[] };
     return { address, sealed: d.sealed, def: decodeDef(Uint8Array.from(d.data)) };

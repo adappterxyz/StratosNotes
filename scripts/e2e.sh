@@ -18,4 +18,4 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 cd packages/flow
-E2E_RPC="http://127.0.0.1:$PORT" npx vitest run test/products.e2e.test.ts --testTimeout=600000 "$@"
+E2E_RPC="http://127.0.0.1:$PORT" npx vitest run test/products.e2e.test.ts test/ccip.e2e.test.ts --no-file-parallelism --testTimeout=600000 "$@"

@@ -191,9 +191,13 @@ fn apply_op(p: &mut Process, d: &WorkflowDef, o: &AssetOp, ctx: &Ctx, fx: &mut E
             let payer = role(p, o.from_role, ctx)?;
             let holders: Vec<(Pubkey, i128)> = p.holdings.iter().filter(|h| h.asset == o.asset2 && h.amount > 0).map(|h| (h.owner, h.amount)).collect();
             for (owner, units) in holders {
-                let pay = mul(units, per_unit)?;
-                debit(p, payer, o.asset, pay)?;
-                credit(p, owner, o.asset, pay)?;
+                // The payer's own units (e.g. an issuer's unsold notes) are paid to itself:
+                // a wash, skipped so an undersubscribed note never needs cash for its own book.
+                if owner != payer {
+                    let pay = mul(units, per_unit)?;
+                    debit(p, payer, o.asset, pay)?;
+                    credit(p, owner, o.asset, pay)?;
+                }
                 if o.retire {
                     debit(p, owner, o.asset2, units)?;
                 }
@@ -253,6 +257,11 @@ pub fn run_step(key: Pubkey, p: &mut Process, d: &WorkflowDef, i: u16, ctx: &Ctx
 
 fn window_open(p: &Process, until: &Due, now: i64) -> bool {
     due_at(p, until).map_or(true, |t| now < t)
+}
+
+/// A step with a repeatable window (e.g. a subscription book) that has closed.
+pub fn window_closed(p: &Process, s: &StepDef, now: i64) -> bool {
+    s.until.as_ref().map_or(false, |u| !window_open(p, u, now))
 }
 
 /// Captures, then the asset operations.

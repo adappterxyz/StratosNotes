@@ -6,6 +6,7 @@ pub const MAX_FIELDS: usize = 64;
 pub const MAX_HOLDINGS: usize = 64;
 pub const MAX_ASSETS: usize = 8;
 pub const MAX_FORWARDERS: usize = 4;
+pub const MAX_CCIP_CHAINS: usize = 4;
 
 /// Program-wide settings: who may deliver CRE reports.
 #[account]
@@ -19,6 +20,41 @@ pub struct Config {
 
 impl Config {
     pub const SPACE: usize = 8 + 32 + 4 + 32 * MAX_FORWARDERS + 1;
+}
+
+/// Chainlink CCIP: the router whose offramps may deliver messages, and the
+/// source/destination chains (CCIP chain selectors) notes accept. A remote
+/// holder's key names its chain by index into `chains` (see `remote_key`).
+#[account]
+pub struct CcipConfig {
+    pub router: Pubkey,
+    pub chains: Vec<u64>,
+    pub bump: u8,
+}
+
+impl CcipConfig {
+    pub const SPACE: usize = 8 + 32 + 4 + 8 * MAX_CCIP_CHAINS + 1;
+}
+
+/// A holder on another chain: `[chain index + 1][11 zero bytes][20-byte EVM address]`.
+/// No one holds its private key: only CCIP messages from that address (and
+/// the engine, paying it out) ever act for it.
+pub fn remote_key(chain: u8, evm: &[u8; 20]) -> Pubkey {
+    let mut b = [0u8; 32];
+    b[0] = chain + 1;
+    b[12..].copy_from_slice(evm);
+    Pubkey::new_from_array(b)
+}
+
+/// (chain index, EVM address) of a remote holder's key, if it is one.
+pub fn remote_of(k: &Pubkey) -> Option<(u8, [u8; 20])> {
+    let b = k.to_bytes();
+    if b[0] == 0 || b[0] as usize > MAX_CCIP_CHAINS || b[1..12].iter().any(|&x| x != 0) {
+        return None;
+    }
+    let mut a = [0u8; 20];
+    a.copy_from_slice(&b[12..]);
+    Some((b[0] - 1, a))
 }
 
 /// A compiled workflow, addressed by the SHA-256 of its bytes. Written in

@@ -8,8 +8,11 @@
 //! keystone forwarder (`on_report`); everything else runs straight through.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
+use anchor_lang::solana_program::program::invoke_signed;
+use anchor_spl::token::{self, Approve, Mint, Token, TokenAccount, Transfer};
 
+pub mod ccip;
 pub mod def;
 pub mod errors;
 pub mod exec;
@@ -17,6 +20,7 @@ pub mod expr;
 pub mod heap;
 pub mod state;
 
+use ccip::*;
 use def::*;
 use errors::EngineError;
 use exec::*;
@@ -273,6 +277,175 @@ pub mod flow_engine {
         Ok(())
     }
 
+    /// Admin: the CCIP router whose offramps may deliver, and the chains notes accept.
+    pub fn set_ccip(ctx: Context<SetCcip>, router: Pubkey, chains: Vec<u64>) -> Result<()> {
+        require!(chains.len() <= MAX_CCIP_CHAINS, EngineError::BadInputs);
+        require_keys_eq!(ctx.accounts.config.admin, ctx.accounts.admin.key(), EngineError::NotAdmin);
+        let c = &mut ctx.accounts.ccip_config;
+        // Chains only append: a remote holder's key names its chain by index.
+        require!(c.chains.iter().zip(chains.iter()).all(|(a, b)| a == b) && chains.len() >= c.chains.len(), EngineError::BadInputs);
+        c.router = router;
+        c.chains = chains;
+        c.bump = ctx.bumps.ccip_config;
+        Ok(())
+    }
+
+    /// Chainlink CCIP: a message (and tokens) from a holder on another chain.
+    /// Called by a CCIP offramp the router allows; see `ccip.rs`.
+    pub fn ccip_receive(ctx: Context<CcipReceive>, message: Any2SVMMessage) -> Result<()> {
+        let chain = ctx.accounts.ccip_config.chains.iter().position(|&c| c == message.source_chain_selector)
+            .ok_or(error!(EngineError::UntrustedCcip))?;
+        require!(message.sender.len() >= 20 && message.token_amounts.len() <= 1, EngineError::BadCcipMessage);
+        let mut evm = [0u8; 20];
+        evm.copy_from_slice(&message.sender[message.sender.len() - 20..]);
+        let sender = remote_key(chain as u8, &evm);
+        let call = CcipCall::try_from_slice(&message.data).map_err(|_| error!(EngineError::BadCcipMessage))?;
+
+        let d = load(&ctx.accounts.definition.to_account_info())?;
+        let key = ctx.accounts.process.key();
+        let now = Clock::get()?.unix_timestamp;
+        let (received, asset) = match message.token_amounts.first() {
+            Some(t) => {
+                let a = ctx.accounts.process.mints.iter().position(|m| *m == t.token).ok_or(error!(EngineError::UnknownMint))? as u8;
+                require!(d.assets.get(a as usize).map_or(false, |x| x.kind == akind::CASH), EngineError::NotCash);
+                require_keys_eq!(ctx.accounts.inbox_token.mint, t.token, EngineError::BadCcipAccounts);
+                (t.amount, Some(a))
+            }
+            None => (0, None),
+        };
+        let p = &mut ctx.accounts.process;
+        let (mut used, mut ran) = (0u64, true);
+        match call {
+            CcipCall::Run { process, step, inputs } => {
+                require_keys_eq!(process, key, EngineError::WrongProcess);
+                // Run on a copy first: if the step cannot run (e.g. the book closed while the
+                // message was in flight), keep the process as it was and refund the sender.
+                let snapshot: Process = (**p).clone();
+                let mut fx = Effects::default();
+                let ok = (|| -> Result<()> {
+                    let s = d.steps.get(step as usize).ok_or(error!(EngineError::BadDefinition))?;
+                    require!(s.kind == kind::USER, EngineError::WrongStepKind);
+                    // A message that arrives after the window closed must not close it as a side effect.
+                    require!(!window_closed(p, s, now), EngineError::StepNotActive);
+                    let holder = p.roles[s.role as usize];
+                    require!(holder == sender || holder == Pubkey::default(), EngineError::WrongRole);
+                    run_step(key, p, &d, step, &Ctx { now, signer: Some(sender), inputs: &inputs, oracle: &[], choice: None }, &mut fx)?;
+                    advance(key, p, &d, now)?;
+                    for &(a, base, from) in fx.deposits.iter() {
+                        require!(Some(a) == asset && from == sender && used + base <= received, EngineError::BadDepositAccounts);
+                        used += base;
+                    }
+                    Ok(())
+                })();
+                if ok.is_err() {
+                    p.set_inner(snapshot);
+                    used = 0;
+                    ran = false;
+                }
+            }
+            CcipCall::Deposit { process, role } => {
+                require_keys_eq!(process, key, EngineError::WrongProcess);
+                let a = asset.ok_or(error!(EngineError::BadCcipMessage))?;
+                let to = match p.roles.get(role as usize).copied().ok_or(error!(EngineError::BadInputs))? {
+                    k if k == Pubkey::default() => sender,
+                    k => k,
+                };
+                deposit_credit(p, to, a, received, d.assets[a as usize].decimals)?;
+                used = received;
+            }
+        }
+        // Whatever the step did not take stays the sender's, withdrawable back to its chain.
+        if let Some(a) = asset {
+            if received > used {
+                deposit_credit(p, sender, a, received - used, d.assets[a as usize].decimals)?;
+            }
+            let (vk, _) = Pubkey::find_program_address(&[b"vault", key.as_ref(), &[a]], &crate::ID);
+            require_keys_eq!(ctx.accounts.vault.key(), vk, EngineError::BadCcipAccounts);
+            let bump = ctx.bumps.inbox;
+            token::transfer(CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(), Transfer {
+                from: ctx.accounts.inbox_token.to_account_info(), to: ctx.accounts.vault.to_account_info(), authority: ctx.accounts.inbox.to_account_info(),
+            }, &[&[b"ccip_inbox", &[bump]]]), received)?;
+        }
+        emit!(CcipReceived { process: key, message_id: message.message_id, sender, received, used, ran });
+        Ok(())
+    }
+
+    /// Anyone: send a remote holder's balance of a token asset to its chain over CCIP.
+    /// `remaining_accounts`: the router's `ccip_send` accounts in order (with this
+    /// program's sender PDA as authority), then the router program.
+    pub fn withdraw_remote<'info>(ctx: Context<'_, '_, 'info, 'info, WithdrawRemote<'info>>, holder: Pubkey, asset: u8, fee_lamports: u64) -> Result<()> {
+        let (chain, evm) = remote_of(&holder).ok_or(error!(EngineError::NotRemote))?;
+        let dest = *ctx.accounts.ccip_config.chains.get(chain as usize).ok_or(error!(EngineError::UntrustedCcip))?;
+        let router = ctx.accounts.ccip_config.router;
+        let d = load(&ctx.accounts.definition.to_account_info())?;
+        let a = d.assets.get(asset as usize).ok_or(error!(EngineError::BadInputs))?;
+        require!(a.kind == akind::CASH, EngineError::NotCash);
+        let decimals = a.decimals;
+        let mint = ctx.accounts.mint.key();
+        let key = ctx.accounts.process.key();
+
+        // 1. Debit the holder's whole balance (in whole base units of the token).
+        let base = {
+            let p = &mut ctx.accounts.process;
+            require_keys_eq!(mint, p.mints[asset as usize], EngineError::BadCcipAccounts);
+            let base = to_base(p.balance(&holder, asset), decimals)?;
+            require!(base > 0, EngineError::NothingToSend);
+            let amt = (base as i128).checked_mul(expr::SCALE).ok_or(error!(EngineError::Overflow))? / 10i128.pow(decimals as u32);
+            debit(p, holder, asset, amt)?;
+            base
+        };
+
+        // 2. Vault -> the sender PDA's token account; let the router's fee-billing signer pull it.
+        let p = &ctx.accounts.process;
+        let (def_key, creator, id, pbump) = (p.definition, p.creator, p.id.to_le_bytes(), p.bump);
+        let pseeds: &[&[u8]] = &[b"proc", def_key.as_ref(), creator.as_ref(), &id, &[pbump]];
+        token::transfer(CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(), Transfer {
+            from: ctx.accounts.vault.to_account_info(), to: ctx.accounts.sender_token.to_account_info(), authority: ctx.accounts.process.to_account_info(),
+        }, &[pseeds]), base)?;
+        let rem = ctx.remaining_accounts;
+        require!(rem.len() > 19, EngineError::BadCcipAccounts);
+        let (router_info, metas_infos) = rem.split_last().unwrap();
+        require_keys_eq!(router_info.key(), router, EngineError::BadCcipAccounts);
+        // Router account order: config, dest_chain_state, nonce, authority, system_program, fee_token_program,
+        // fee_token_mint, fee_token_user_ata, fee_token_receiver, fee_billing_signer, ...; then the token's accounts,
+        // whose first is the authority's token account.
+        let sender = ctx.accounts.sender.key();
+        require_keys_eq!(metas_infos[3].key(), sender, EngineError::BadCcipAccounts);
+        require_keys_eq!(metas_infos[18].key(), ctx.accounts.sender_token.key(), EngineError::BadCcipAccounts);
+        let fee_billing_signer = metas_infos[9].clone();
+        let sbump = ctx.bumps.sender;
+        let sseeds: &[&[u8]] = &[b"ccip_sender", &[sbump]];
+        token::approve(CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(), Approve {
+            to: ctx.accounts.sender_token.to_account_info(), delegate: fee_billing_signer, authority: ctx.accounts.sender.to_account_info(),
+        }, &[sseeds]), base)?;
+
+        // 3. The caller funds the CCIP fee (native SOL) into the sender PDA.
+        if fee_lamports > 0 {
+            anchor_lang::system_program::transfer(CpiContext::new(ctx.accounts.system_program.to_account_info(), anchor_lang::system_program::Transfer {
+                from: ctx.accounts.payer.to_account_info(), to: ctx.accounts.sender.to_account_info(),
+            }), fee_lamports)?;
+        }
+
+        // 4. ccip_send: the tokens to the holder's address on its chain.
+        let msg = SVM2AnyMessage {
+            receiver: evm_receiver(&evm),
+            data: vec![],
+            token_amounts: vec![SVMTokenAmount { token: mint, amount: base }],
+            fee_token: Pubkey::default(),
+            extra_args: evm_extra_args(0),
+        };
+        let mut data = CCIP_SEND.to_vec();
+        dest.serialize(&mut data)?;
+        msg.serialize(&mut data)?;
+        vec![0u8].serialize(&mut data)?; // token_indexes: the token's accounts start right after the fixed ones
+        let metas: Vec<AccountMeta> = metas_infos.iter().map(|i| AccountMeta {
+            pubkey: i.key(), is_signer: i.is_signer || i.key() == sender, is_writable: i.is_writable,
+        }).collect();
+        invoke_signed(&Instruction { program_id: router, accounts: metas, data }, metas_infos, &[sseeds])?;
+        emit!(CcipSent { process: key, holder, asset, amount: base, dest_chain_selector: dest });
+        Ok(())
+    }
+
     /// Chainlink CRE: the keystone forwarder CPIs here with a DON-verified report.
     pub fn on_report(ctx: Context<OnReport>, _metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
         // The forwarder program owns `state` and signs as PDA("forwarder", state, this program).
@@ -440,6 +613,75 @@ pub struct TransferUnits<'info> {
     /// CHECK: a sealed Definition owned by this program (checked in `load`).
     pub definition: UncheckedAccount<'info>,
     pub signer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetCcip<'info> {
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(init_if_needed, payer = admin, space = CcipConfig::SPACE, seeds = [b"ccip_config"], bump)]
+    pub ccip_config: Account<'info, CcipConfig>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// The CCIP receiver interface: the offramp's authority PDA signs; the router's
+/// allowed_offramp PDA proves the offramp is allowed for the source chain. The
+/// rest are this program's accounts, listed by the sender in the message's
+/// extra args (process, definition, inbox, inbox token account, vault, token program).
+#[derive(Accounts)]
+#[instruction(message: Any2SVMMessage)]
+pub struct CcipReceive<'info> {
+    #[account(seeds = [b"external_execution_config", crate::ID.as_ref()], bump, seeds::program = offramp_program.key())]
+    pub authority: Signer<'info>,
+    /// CHECK: only used to derive the authority and allowed_offramp PDAs.
+    pub offramp_program: UncheckedAccount<'info>,
+    /// CHECK: exists (owned by the router) only if the router allows this offramp for the source chain.
+    #[account(
+        owner = ccip_config.router @ EngineError::UntrustedCcip,
+        seeds = [b"allowed_offramp", message.source_chain_selector.to_le_bytes().as_ref(), offramp_program.key().as_ref()],
+        bump,
+        seeds::program = ccip_config.router,
+    )]
+    pub allowed_offramp: UncheckedAccount<'info>,
+    #[account(seeds = [b"ccip_config"], bump = ccip_config.bump)]
+    pub ccip_config: Account<'info, CcipConfig>,
+    #[account(mut, has_one = definition)]
+    pub process: Account<'info, Process>,
+    /// CHECK: a sealed Definition owned by this program (checked in `load`).
+    pub definition: UncheckedAccount<'info>,
+    /// CHECK: the inbox PDA: CCIP delivers tokens to its token accounts (the message's token receiver).
+    #[account(seeds = [b"ccip_inbox"], bump)]
+    pub inbox: UncheckedAccount<'info>,
+    #[account(mut, token::authority = inbox)]
+    pub inbox_token: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+#[instruction(holder: Pubkey, asset: u8)]
+pub struct WithdrawRemote<'info> {
+    #[account(mut, has_one = definition)]
+    pub process: Account<'info, Process>,
+    /// CHECK: a sealed Definition owned by this program (checked in `load`).
+    pub definition: UncheckedAccount<'info>,
+    #[account(seeds = [b"ccip_config"], bump = ccip_config.bump)]
+    pub ccip_config: Account<'info, CcipConfig>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: the sender PDA (holds only SOL): CCIP's `authority`, paying the fee in SOL.
+    #[account(mut, seeds = [b"ccip_sender"], bump)]
+    pub sender: UncheckedAccount<'info>,
+    #[account(mut, token::mint = mint, token::authority = sender)]
+    pub sender_token: Account<'info, TokenAccount>,
+    #[account(mut, seeds = [b"vault", process.key().as_ref(), &[asset]], bump)]
+    pub vault: Account<'info, TokenAccount>,
+    pub mint: Account<'info, Mint>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

@@ -8,6 +8,187 @@
   },
   "instructions": [
     {
+      "name": "ccip_receive",
+      "docs": [
+        "Chainlink CCIP: a message (and tokens) from a holder on another chain.",
+        "Called by a CCIP offramp the router allows; see `ccip.rs`."
+      ],
+      "discriminator": [
+        11,
+        244,
+        9,
+        249,
+        44,
+        83,
+        47,
+        245
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  116,
+                  101,
+                  114,
+                  110,
+                  97,
+                  108,
+                  95,
+                  101,
+                  120,
+                  101,
+                  99,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  127,
+                  87,
+                  69,
+                  238,
+                  115,
+                  56,
+                  196,
+                  51,
+                  107,
+                  151,
+                  37,
+                  186,
+                  164,
+                  69,
+                  194,
+                  75,
+                  208,
+                  153,
+                  169,
+                  223,
+                  107,
+                  100,
+                  126,
+                  5,
+                  178,
+                  114,
+                  199,
+                  219,
+                  23,
+                  206,
+                  18,
+                  147
+                ]
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "offramp_program"
+            }
+          }
+        },
+        {
+          "name": "offramp_program"
+        },
+        {
+          "name": "allowed_offramp"
+        },
+        {
+          "name": "ccip_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        },
+        {
+          "name": "inbox",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  105,
+                  110,
+                  98,
+                  111,
+                  120
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "inbox_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "message",
+          "type": {
+            "defined": {
+              "name": "Any2SVMMessage"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "create_definition",
       "docs": [
         "Start storing a compiled workflow of `len` bytes whose SHA-256 is `hash`."
@@ -426,6 +607,87 @@
       "args": []
     },
     {
+      "name": "set_ccip",
+      "docs": [
+        "Admin: the CCIP router whose offramps may deliver, and the chains notes accept."
+      ],
+      "discriminator": [
+        35,
+        152,
+        196,
+        93,
+        37,
+        194,
+        16,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ccip_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "router",
+          "type": "pubkey"
+        },
+        {
+          "name": "chains",
+          "type": {
+            "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
       "name": "set_forwarders",
       "discriminator": [
         21,
@@ -668,6 +930,121 @@
       ]
     },
     {
+      "name": "withdraw_remote",
+      "docs": [
+        "Anyone: send a remote holder's balance of a token asset to its chain over CCIP.",
+        "`remaining_accounts`: the router's `ccip_send` accounts in order (with this",
+        "program's sender PDA as authority), then the router program."
+      ],
+      "discriminator": [
+        135,
+        200,
+        45,
+        240,
+        165,
+        104,
+        44,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "process",
+          "writable": true
+        },
+        {
+          "name": "definition",
+          "relations": [
+            "process"
+          ]
+        },
+        {
+          "name": "ccip_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sender",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  115,
+                  101,
+                  110,
+                  100,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sender_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "holder",
+          "type": "pubkey"
+        },
+        {
+          "name": "asset",
+          "type": "u8"
+        },
+        {
+          "name": "fee_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "write_definition",
       "docs": [
         "Append one chunk, written straight into the account (it grows to fit)."
@@ -706,6 +1083,19 @@
     }
   ],
   "accounts": [
+    {
+      "name": "CcipConfig",
+      "discriminator": [
+        157,
+        171,
+        196,
+        124,
+        5,
+        236,
+        113,
+        101
+      ]
+    },
     {
       "name": "Config",
       "discriminator": [
@@ -747,6 +1137,32 @@
     }
   ],
   "events": [
+    {
+      "name": "CcipReceived",
+      "discriminator": [
+        197,
+        242,
+        40,
+        235,
+        126,
+        85,
+        20,
+        119
+      ]
+    },
+    {
+      "name": "CcipSent",
+      "discriminator": [
+        112,
+        113,
+        202,
+        131,
+        107,
+        161,
+        23,
+        161
+      ]
+    },
     {
       "name": "StepRun",
       "discriminator": [
@@ -929,9 +1345,179 @@
       "code": 6030,
       "name": "NotTransferable",
       "msg": "Only note units (issued assets) can be transferred; withdraw cash instead"
+    },
+    {
+      "code": 6031,
+      "name": "UntrustedCcip",
+      "msg": "The CCIP message did not come through an offramp the CCIP router allows, or from an accepted chain"
+    },
+    {
+      "code": 6032,
+      "name": "BadCcipMessage",
+      "msg": "The CCIP message does not decode, or carries more than one token"
+    },
+    {
+      "code": 6033,
+      "name": "UnknownMint",
+      "msg": "The token is not an asset of this process"
+    },
+    {
+      "code": 6034,
+      "name": "NotRemote",
+      "msg": "Not a remote (cross-chain) holder"
+    },
+    {
+      "code": 6035,
+      "name": "BadCcipAccounts",
+      "msg": "CCIP accounts are missing or do not match"
+    },
+    {
+      "code": 6036,
+      "name": "NothingToSend",
+      "msg": "Nothing to send"
     }
   ],
   "types": [
+    {
+      "name": "Any2SVMMessage",
+      "docs": [
+        "What the CCIP offramp passes to a receiver (CCIP's Any2SVMMessage)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source_chain_selector",
+            "type": "u64"
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "token_amounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SVMTokenAmount"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipConfig",
+      "docs": [
+        "Chainlink CCIP: the router whose offramps may deliver messages, and the",
+        "source/destination chains (CCIP chain selectors) notes accept. A remote",
+        "holder's key names its chain by index into `chains` (see `remote_key`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "router",
+            "type": "pubkey"
+          },
+          {
+            "name": "chains",
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipReceived",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "process",
+            "type": "pubkey"
+          },
+          {
+            "name": "message_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "received",
+            "docs": [
+              "Base units received and how many were used by the step (the rest is credited to the sender)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "used",
+            "type": "u64"
+          },
+          {
+            "name": "ran",
+            "docs": [
+              "false: the step could not run; everything was credited to the sender."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CcipSent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "process",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "dest_chain_selector",
+            "type": "u64"
+          }
+        ]
+      }
+    },
     {
       "name": "Config",
       "docs": [
@@ -1110,6 +1696,22 @@
           {
             "name": "steps_run",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SVMTokenAmount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }
