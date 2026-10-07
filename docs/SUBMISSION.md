@@ -14,6 +14,7 @@ and delivered tokens between the chains.
 - Code: https://github.com/adappterxyz/StratosNotes
 - Demo video (2 min): https://sp.stratoslab.app/#demo (file: https://sp.stratoslab.app/demo.mp4)
 - Deck: https://sp.stratoslab.app/deck.pptx
+- CRE evidence (simulation logs + devnet transactions): [cre-evidence.md](cre-evidence.md)
 - Demo script: [DEMO.md](DEMO.md) · Cross-chain details and transactions: [crosschain.md](crosschain.md)
 
 ## Tracks
