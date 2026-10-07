@@ -1,28 +1,29 @@
 # Demo script (4 minutes)
 
-A note's life takes longer than a pitch, so one note is started before you
-present and its strike lands while you talk; a second is designed and issued
-live; a finished one proves the payouts.
+A note's life takes longer than a pitch, so one worst-of note is started
+before you present and its strikes land while you talk. A second is issued
+live from a template, and a finished one proves the payouts.
 
 ## Before you present (15 minutes ahead)
 
 1. **Keeper running.** `pm2 status stratosnotes-keeper` shows `online` (start
    it with `pm2 start scripts/keeper-loop.sh --name stratosnotes-keeper --interpreter bash`).
    It runs the CRE workflow every minute and broadcasts to devnet.
-2. **A note in flight.** Issue one whose strike lands about 3 minutes into the
-   talk:
+2. **A worst-of note in flight.** Issue one whose strike lands about 3 minutes
+   into the talk:
    ```bash
    cd packages/flow
-   STRIKE_IN=720 OBS_EVERY=120 npx tsx scripts/devnet.ts issue phoenix
+   STRIKE_IN=720 OBS_EVERY=120 npx tsx scripts/devnet.ts issue worst-of
    ```
-   Note the `process` address it prints; two demo investors are already subscribed.
+   Note the `process` address it prints; two demo investors are already
+   subscribed. (`issue phoenix` gives a single-asset note instead.)
 3. **Wallet.** Phantom (or Solflare) on **devnet**, with ~0.2 devnet SOL
-   (faucet.solana.com). In the app, press **Get test USDC** once.
+   (faucet.solana.com). In the app, press **Test USDC** in the top bar once.
 4. **Tabs, in order:**
    1. Marketplace: https://sp.stratoslab.app/app
    2. The in-flight note: `https://sp.stratoslab.app/app/note/<process>`
-   3. Issue workspace: `https://sp.stratoslab.app/app/issue`
-   4. The finished phoenix: `https://sp.stratoslab.app/app/note/8SvcVvQ8vYAtVdLs4gF3Rc1MNybqWh2kFfPCTpD1heGG`
+   3. Issue workspace: https://sp.stratoslab.app/app/issue
+   4. The finished worst-of note: https://sp.stratoslab.app/app/note/3o6EuEWkQ6now9b5TEd85BUEdQGeQfHGotDuLP1LPkUj
    5. Terminal: `pm2 logs stratosnotes-keeper --lines 0`
    6. Solana Explorer (devnet), ready to paste a transaction.
 
@@ -30,57 +31,70 @@ live; a finished one proves the payouts.
 
 **0:00 The problem (20 s).** "A structured note is a promise about dates and
 prices. Today a bank's calculation agent watches the dates and a paying agent
-moves the money. Here, the workflow runs on Solana and Chainlink CRE is the
-calculation agent."
+moves the money. StratosNotes is a self-service issuance engine and marketplace:
+the workflow runs on Solana and Chainlink CRE is the calculation agent."
 
-**0:20 Marketplace (30 s).** Tab 1. "Every offering here is read straight from
-Solana." Open the in-flight note (tab 2): term sheet, payout chart, the
-schedule set at pre-trade, and the BPMN workflow with the step it is on
-highlighted. "Its book closes in about two minutes."
+**0:20 Marketplace (30 s).** Tab 1. "Every note here is read straight from
+Solana: open books, live notes, and with **Redeemed** selected, the finished
+ones." Toggle **Redeemed** on and off, filter by underlying. Open the in-flight
+note (tab 2): the term sheet, the three underlyings with their feeds, the
+schedule set at pre-trade, and the BPMN workflow with its current step
+highlighted. "Its book closes in about two minutes, and this page updates
+by itself when anything happens."
 
 **0:50 Subscribe (30 s).** Enter 200 units, **Subscribe**, approve in the
 wallet. "One transaction: my USDC for note units, atomically." The position
 card appears with a **Transfer** form: "units can be sold on, in whole or in
 part; later coupons follow them."
 
-**1:20 Design with AI (60 s).** Tab 3, the Issue workspace. Open **AI** and type:
+**1:20 Issue from a template (50 s).** Tab 3, the Issue workspace. "An issuer
+starts from a template, a term sheet, the AI or a blank canvas." Under
+**Published templates**, open **12M Phoenix on BTC with servicing fee**. "This
+template was designed in this workspace and saved to the library: a phoenix
+where the issuer pays the paying agent a fee with each coupon. It is a workflow,
+so the fee is on the canvas," and point at a **Pay Coupon … + Servicing Fee** step.
+It opens on **Issue**: size, strike in 5 minutes, observations every 3 minutes,
+the reserve. "Publish, and the book opens on the marketplace." (Publish only
+if time allows; it takes two wallet approvals and the issuer's test USDC.)
+
+**2:10 Design with AI (40 s).** Press **Templates**, then **AI**, and type:
 > 12 month phoenix on the worst of ETH and BTC, 10% p.a. paid quarterly, 70% coupon barrier with memory, autocall at 100% from the second quarter, knock-in 60%
 
-"It extracts the terms (10% a year becomes 2.5% a quarter, two underlyings
-make a worst-of basket) and asks if anything is missing." Review the term
-sheet in the dialog and press **Open workflow**: each observation reads both
-feeds in one CRE report and tests the worst performer. Then:
-> pay the paying agent a 0.1% servicing fee after each coupon
+"10% a year becomes 2.5% a quarter, and two underlyings make a worst-of
+basket." Press **Open workflow** in the dialog, then show **Payoff** (the
+reference payoff and the what-if) and **Template**: "save it, and every issuer
+can issue it."
 
-"The change comes back as a patch, highlighted, and passes the validator and
-compiler before it can be issued." Point at **Validate** (no errors) and the
-**Edited: custom workflow** badge in Overview, then **Template**: "saved
-designs go into a library any issuer can issue from." Finish on **Issue**:
-size, strike in 5 minutes, observations every 3 minutes.
+**2:50 CRE fixes the strikes (40 s).** Tab 5: the keeper log shows
+`<process> Task_FixStrike [three prices] -> written` for the in-flight note
+(prices in 10-decimal fixed point). "That's the
+CRE workflow: it found the strike was due, read three Chainlink feeds at the
+finalized block, and wrote one signed report through Chainlink's forwarder."
+Back on tab 2, without refreshing: three strikes, the book closed, the
+highlight on the first observation. Paste the transaction into the explorer if
+asked: the forwarder program calls the engine's `OnReport`.
 
-**2:20 CRE fixes the strike (60 s).** Tab 5: the keeper log shows
-`Task_FixStrike … -> written` for the in-flight note. "That's the CRE workflow:
-it found the strike was due, read ETH/USD from Chainlink at the finalized
-block, and wrote a signed report through Chainlink's forwarder." Paste the
-transaction into the explorer: the forwarder program calls the engine's
-`OnReport`. Back on tab 2 (it updates live, as the account changes): the strike appears, the
-book is closed, the highlight has moved to the first observation.
-
-**3:20 It pays (30 s).** Tab 4, the finished phoenix: "This one ran its whole
-life with nobody touching it after issuance: CRE fixed the strike, observed
-twice, paid two coupons and autocalled. One investor had sold 100 units
-mid-way; everyone was paid exactly for what they held: 525, 420 and 105 USDC."
+**3:30 It pays (20 s).** Tab 4, the finished worst-of note: "This one ran its
+whole life with nobody touching it after issuance. CRE fixed three strikes,
+observed twice, the worst performer stayed above every barrier, it paid two
+coupons and autocalled: 636 and 424 USDC for 600 and 400 units, exactly the
+reference payoff."
 
 **3:50 Close (10 s).** "One Solana program runs every note as a BPMN workflow;
-one CRE workflow observes them all. Issue one yourself: the link is in the
-submission."
+one CRE workflow observes them all; anyone can issue from the library. The
+link is in the submission."
 
 ## If something goes wrong
 
-- **Strike not written yet:** CRE reads at the finalized block, so a report
+- **Strikes not written yet:** CRE reads at the finalized block, so a report
   lands about a minute after its time. Show tab 4 first and come back.
-- **AI slow or busy:** open **12M Phoenix (memory) on ETH** under Products in the Issue workspace,
-  then edit a gateway condition by hand (select the flow, change the condition);
-  the checks update live.
-- **Wallet has no USDC:** press **Get test USDC** (once per 10 minutes per wallet).
+- **AI slow or busy:** open **12M Worst-of Phoenix on ETH, BTC, SOL** under
+  Products instead, then edit a gateway condition by hand (select the flow,
+  change the condition); **Validate** updates live.
+- **No templates listed:** reseed with `npx tsx scripts/seed-templates.ts` in
+  `packages/flow` (about a minute; devnet RPC may rate-limit, rerun with
+  `ONLY=<part of a name>` for any it missed).
+- **Wallet has no USDC:** press **Test USDC** (once per 10 minutes per wallet).
+- **Page not updating:** it re-reads every 20 seconds even if the live
+  connection drops; a refresh shows the latest at once.
 - **Explorer slow:** the keeper log line already shows the result.
