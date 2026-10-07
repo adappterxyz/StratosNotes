@@ -8,11 +8,7 @@ const REPO_URL = 'https://github.com/adappterxyz/StratosNotes';
 const FLOW_URL = 'https://stratoslab.app';
 const EXPLORER = (tx: string) => `https://explorer.solana.com/tx/${tx}?cluster=devnet`;
 
-const CHAINS: Record<Chain, { label: string; logo: string; lang: string }> = {
-  solana: { label: 'Solana', logo: '/logos/chains/solana-w.svg', lang: 'StratosNotes engine' },
-  canton: { label: 'Canton', logo: '/logos/chains/canton-w.svg', lang: 'Daml' },
-  evm: { label: 'EVM', logo: '/logos/chains/ethereum-w.svg', lang: 'Solidity' },
-};
+const CHAIN: Chain = 'solana';
 
 // The devnet run: a phoenix on ETH that Chainlink CRE ran end to end.
 const RUN = [
@@ -30,7 +26,6 @@ const PAID = [
 export default function Landing() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState('observe');
-  const [chain, setChain] = useState<Chain>('solana');
   const step = STEPS.find(s => s.id === active)!;
 
   // Terrain, nav state, reveals (shared with the Flow landing).
@@ -149,7 +144,7 @@ export default function Landing() {
             <a href="#how">How it works</a>
             <a href="#lifecycle">Lifecycle</a>
             <a href="#proof">Proof</a>
-            <a href="#chains">Chains</a>
+            <a href="#solana">Solana</a>
             <a href={REPO_URL} target="_blank" rel="noopener">Code</a>
           </nav>
           <div className="nav-cta">
@@ -166,12 +161,12 @@ export default function Landing() {
               <span><b>Live on Solana devnet</b> · observed by Chainlink CRE</span>
             </div>
             <h1 data-reveal data-reveal-d="1">
-              The structured note lifecycle,<br /><span className="grad-text">on every chain.</span>
+              The structured note lifecycle,<br /><span className="grad-text">on Solana.</span>
             </h1>
             <p className="sub" data-reveal data-reveal-d="2">
-              Design a note from a term sheet, a sentence or a BPMN diagram. Sell it for stablecoins,
-              let holders transfer it, and let Chainlink CRE fix the strike, observe every date and trigger
-              every coupon, autocall and redemption. One lifecycle, on Solana, Canton or EVM.
+              Design a note on one asset or a worst-of basket, from a template, a term sheet, a sentence or a
+              BPMN diagram. Sell it for USDC, let holders transfer it, and let Chainlink CRE fix the strike,
+              observe every date and trigger every coupon, autocall and redemption, all on Solana.
             </p>
             <div className="hero-cta" data-reveal data-reveal-d="3">
               <a href="#lifecycle" className="btn btn-primary">Walk the lifecycle <span className="arrow">→</span></a>
@@ -182,7 +177,7 @@ export default function Landing() {
               <span className="sep">→</span>
               <span className="chip"><i style={{ background: 'var(--purple)' }} /> BPMN workflow</span>
               <span className="sep">→</span>
-              <span className="chip"><i style={{ background: 'var(--cyan)' }} /> Solana · Canton · EVM</span>
+              <span className="chip"><i style={{ background: 'var(--cyan)' }} /> Solana devnet</span>
               <span className="sep">→</span>
               <span className="chip"><i style={{ background: 'var(--blue)' }} /> Chainlink CRE observes</span>
             </div>
@@ -226,8 +221,8 @@ export default function Landing() {
           <div className="wrap">
             <div className="section-head" data-reveal>
               <span className="eyebrow">The lifecycle</span>
-              <h2>One step. <span className="grad-text">Three ledgers.</span></h2>
-              <p>The same phoenix note, step by step. Pick a step and a chain to see what it really is there: the StratosNotes engine on Solana, generated Daml on Canton, generated Solidity on EVM.</p>
+              <h2>Every step, <span className="grad-text">on-chain.</span></h2>
+              <p>The same phoenix note, step by step. Pick a step to see what it really is: an instruction of the StratosNotes engine on Solana, or the Chainlink CRE workflow that drives it.</p>
             </div>
             <div className="demo-shell" data-reveal>
               <div className="demo-topbar">
@@ -269,17 +264,9 @@ export default function Landing() {
                   <h4>{step.title}</h4>
                   <p>{step.desc}</p>
                 </div>
-                <div className="chain-tabs" role="tablist" aria-label="Ledger">
-                  {(Object.keys(CHAINS) as Chain[]).map(ch => (
-                    <button key={ch} type="button" role="tab" className="chain-tab" aria-selected={chain === ch} onClick={() => setChain(ch)}>
-                      {/* The Canton logo is a wordmark: no second label. */}
-                      <img src={CHAINS[ch].logo} alt={ch === 'canton' ? 'Canton' : ''} style={ch === 'canton' ? { height: 11 } : undefined} />{ch !== 'canton' && CHAINS[ch].label}
-                    </button>
-                  ))}
-                </div>
-                <div className="code-meta">Triggered by <b>{step.actor}</b> · {CHAINS[chain].lang}</div>
+                <div className="code-meta"><img src="/logos/chains/solana-w.svg" alt="" style={{ height: 11, verticalAlign: -1, marginRight: 6 }} />Triggered by <b>{step.actor}</b> · StratosNotes engine on Solana</div>
                 <div className="code-body">
-                  <pre className="daml" dangerouslySetInnerHTML={{ __html: step.code[chain] }} />
+                  <pre className="daml" dangerouslySetInnerHTML={{ __html: step.code[CHAIN] }} />
                 </div>
               </div>
             </div>
@@ -365,44 +352,44 @@ export default function Landing() {
             <div className="orchestration" data-reveal>
               <div className="orch-copy">
                 <span className="orch-label">Orchestration</span>
-                <p><strong>Chainlink CRE</strong> is the calculation agent: one workflow reads Chainlink feeds and writes signed reports for every note. <strong>Cloudflare Workflows</strong> run Flow's Canton reactors and host the apps.</p>
+                <p><strong>Chainlink CRE</strong> is the calculation agent: one workflow reads Chainlink feeds and writes signed reports for every note. <strong>Cloudflare Workers</strong> host the app, the AI that reads term sheets and the template library.</p>
               </div>
               <div className="orch-logos">
                 <div className="orch-logo"><img className="orch-mark" src="/logos/chainlink.svg" alt="Chainlink" /><span className="orch-name"><strong>Chainlink</strong><span>CRE + Data Feeds</span></span></div>
-                <div className="orch-logo"><img className="orch-mark" src="/logos/cloudflare.svg" alt="Cloudflare" /><span className="orch-name"><strong>Cloudflare</strong><span>Workflows + Workers AI</span></span></div>
+                <div className="orch-logo"><img className="orch-mark" src="/logos/cloudflare.svg" alt="Cloudflare" /><span className="orch-name"><strong>Cloudflare</strong><span>Workers + Workers AI</span></span></div>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="chains">
+        <section id="solana">
           <div className="wrap">
             <div className="section-head" data-reveal>
-              <span className="eyebrow">Multichain</span>
-              <h2>Same payoff, <span className="grad-text">the ledger your investors use</span>.</h2>
-              <p>The payoff is defined once and tested against one reference. Issue where the investors are: public Solana for open distribution, Canton for private institutional books, EVM for DeFi.</p>
+              <span className="eyebrow">Why Solana</span>
+              <h2>One program, <span className="grad-text">every note</span>.</h2>
+              <p>Every issuance is an account of one Solana program, priced by Chainlink and settled in USDC. Fast, cheap transactions make a quarterly product something you can watch run in minutes.</p>
             </div>
             <div className="chain-cards">
               <div className="chain-card" data-reveal>
-                <div className="logo"><img src="/logos/chains/solana-w.svg" alt="" /> Solana</div>
+                <div className="logo"><img src="/logos/chains/solana-w.svg" alt="" /> The engine</div>
                 <span className="status-pill"><i />Live on devnet</span>
-                <p>One Anchor program runs every note as a BPMN workflow; CRE reports arrive through Chainlink's keystone forwarder.</p>
-                <ul><li>Open books, atomic USDC DvP, transfers</li><li>One CRE workflow observes every note</li><li>Self-service marketplace and studio</li></ul>
-                <span className="foot-note">StratosNotes</span>
+                <p>One Anchor program runs every note as a BPMN workflow. A workflow is stored once, addressed by its hash; each issuance is a process of it.</p>
+                <ul><li>Coupons, autocalls, knock-in and redemption on-chain</li><li>Exact 10-decimal fixed-point arithmetic</li><li>Worst-of baskets of up to three assets</li></ul>
+                <span className="foot-note">flow_engine</span>
               </div>
               <div className="chain-card" data-reveal data-reveal-d="1">
-                <div className="logo"><img src="/logos/chains/canton-w.svg" alt="Canton" style={{ height: 18 }} /></div>
-                <span className="status-pill verified"><i />Verified on a Canton sandbox</span>
-                <p>The same products compile to Daml: a process per party, CIP-56 token holdings, privacy by default.</p>
-                <ul><li>Data shared only with entitled parties</li><li>Holdings custodied by the issuer's registry</li><li>Run by CRE or Cloudflare reactors</li></ul>
-                <span className="foot-note">via Flow</span>
+                <div className="logo"><img src="/logos/chainlink.svg" alt="" /> CRE on Solana</div>
+                <span className="status-pill"><i />Runs every note</span>
+                <p>One Chainlink CRE workflow reads the price feeds and writes DON-signed reports to Solana through the keystone forwarder. The engine accepts prices only from Chainlink.</p>
+                <ul><li>Every report under 100k compute units</li><li>All of a basket's prices in one report</li><li>Prices from Chainlink's Ethereum feeds, read only</li></ul>
+                <span className="foot-note">notes-keeper</span>
               </div>
               <div className="chain-card" data-reveal data-reveal-d="2">
-                <div className="logo"><img src="/logos/chains/ethereum-w.svg" alt="" /> EVM</div>
-                <span className="status-pill verified"><i />Verified with Foundry and anvil</span>
-                <p>A self-contained Solidity contract with the same payoff, compiled in the browser and deployed by the issuance workflow.</p>
-                <ul><li>ERC-20 note units and stablecoin settlement</li><li>Chainlink feeds for every observation</li><li>Ethereum, Base and other EVM chains</li></ul>
-                <span className="foot-note">via Flow</span>
+                <div className="logo"><img src="/logos/chains/solana-w.svg" alt="" /> An open market</div>
+                <span className="status-pill"><i />Self-service</span>
+                <p>Anyone can issue from a template or their own design, and anyone can subscribe: each subscription is one atomic USDC-for-note swap.</p>
+                <ul><li>Open books until the strike date</li><li>Transfers in whole or in part</li><li>A shared template library</li></ul>
+                <span className="foot-note">sp.stratoslab.app/app</span>
               </div>
             </div>
             <p style={{ marginTop: 16, color: 'var(--muted)', fontSize: 11.5, fontFamily: 'var(--font-mono)' }}>Chain and partner logos are trademarks of their respective owners. No endorsement implied.</p>
@@ -430,11 +417,11 @@ export default function Landing() {
           <div className="foot-links">
             <a href="#lifecycle">Lifecycle</a>
             <a href="#proof">Proof</a>
-            <a href="#chains">Chains</a>
+            <a href="#solana">Solana</a>
             <a href={FLOW_URL} target="_blank" rel="noopener">StratosFlow</a>
             <a href={REPO_URL} target="_blank" rel="noopener">GitHub</a>
           </div>
-          <small>© {new Date().getFullYear()} StratosNotes · by Stratos Lab · Solana · Canton · EVM</small>
+          <small>© {new Date().getFullYear()} StratosNotes · by Stratos Lab · Solana · Chainlink CRE</small>
         </div>
       </footer>
     </div>
