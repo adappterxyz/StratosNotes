@@ -168,6 +168,8 @@ table.t .r { text-align: right; }
 .ws-body { flex: 1; min-height: 0; display: flex; }
 .ws-canvas { flex: 1; min-width: 0; position: relative; }
 .ws-canvas .bpmn { position: absolute; inset: 0; height: auto; border: 0; border-radius: 0; }
+/* Nothing open: the (empty) canvas stays mounted for bpmn-js but must never take the start page's clicks. */
+.ws-canvas.empty .bpmn { visibility: hidden; pointer-events: none; }
 .ws-panel { width: 380px; flex: none; border-left: 1px solid hsl(var(--border)); background: hsl(var(--card)); overflow-y: auto; min-height: 0; }
 .ws-start { position: absolute; inset: 0; overflow-y: auto; background: hsl(var(--background)); z-index: 5; }
 .ws-start-inner { max-width: 920px; margin: 0 auto; padding: 40px 20px 56px; display: grid; gap: 22px; }

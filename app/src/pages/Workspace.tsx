@@ -12,7 +12,7 @@ import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
 import {
-  ArrowRight, BookOpen, CheckCircle2, AlertCircle, ChevronRight, Download, FilePlus2, FileUp, LayoutList, LineChart, Rocket, Sparkles, TrendingUp, Workflow, X,
+  ArrowRight, BookOpen, LayoutTemplate, CheckCircle2, AlertCircle, ChevronRight, Download, FilePlus2, FileUp, LayoutList, LineChart, Rocket, Sparkles, TrendingUp, Workflow, X,
 } from 'lucide-react';
 import {
   buildWorkflow, chain, check, compileTemplate, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, field, instantiateProduct, irToDraft, normalizeParams, parseBpmn,
@@ -119,6 +119,8 @@ export default function Workspace() {
     setStage('design');
   };
   const close = () => { setDoc(null); setBuilt(null); setSelected(null); setSearch({}, { replace: true }); };
+  /** Back to the start page, at the template list (the open workflow is closed). */
+  const showTemplates = () => { close(); setTimeout(() => document.getElementById('templates')?.scrollIntoView({ behavior: 'smooth' }), 50); };
 
   // Deep links: /issue?template=<definition> or /issue?product=<type>.
   const linked = useRef(false);
@@ -211,6 +213,7 @@ export default function Workspace() {
         <div className="ws-bar">
           <input ref={fileInput} type="file" accept=".bpmn,.xml" hidden onChange={e => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ''; }} />
           {doc && <button className="btn" onClick={close} title="Close this workflow"><X className="i" />Close</button>}
+          <button className="btn" onClick={showTemplates} title="Products and published templates"><LayoutTemplate className="i" />Templates</button>
           <button className="btn" onClick={() => fileInput.current?.click()}><FileUp className="i" />Import</button>
           {doc && <button className="btn" onClick={exportFile}><Download className="i" />Export BPMN</button>}
           {doc && <span className="row" style={{ gap: 4 }}><ChevronRight className="i dim" /><span className="name" title={doc.name}>{doc.name}</span></span>}
@@ -227,7 +230,7 @@ export default function Workspace() {
           )}
         </div>
         <div className="ws-body">
-          <div className="ws-canvas">
+          <div className={`ws-canvas ${doc ? '' : 'empty'}`}>
             <div ref={host} className="bpmn" aria-label="Workflow editor" />
             {!doc && (
               <div className="ws-start">
