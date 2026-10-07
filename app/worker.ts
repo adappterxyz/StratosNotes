@@ -18,6 +18,8 @@ interface Env {
   FAUCET: KVNamespace;
   FAUCET_KEY: string; // JSON array secret key (devnet only)
   TEST_USDC: string;
+  /** The test USDC mint authority when it is an SPL multisig (CCIP pool signer + faucet key). */
+  TEST_USDC_MINT_MULTISIG?: string;
 }
 
 const AMOUNT = 2_000n * 1_000_000n; // 2,000 test USDC (6 decimals)
@@ -41,7 +43,11 @@ async function faucet(req: Request, env: Env): Promise<Response> {
   if (now - last < COOLDOWN_SEC) return json({ error: `Already sent; try again in ${Math.ceil((COOLDOWN_SEC - (now - last)) / 60)} min.` }, 429);
   const mint = new PublicKey(env.TEST_USDC);
   const signer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(env.FAUCET_KEY)));
-  const tx = new Transaction().add(createMintToInstruction(mint, getAssociatedTokenAddressSync(mint, owner), signer.publicKey, AMOUNT));
+  // Since test USDC became a CCIP cross-chain token, its mint authority is a 1-of-2 SPL
+  // multisig (the CCIP pool signer and this faucet key): the faucet mints as a member.
+  const authority = env.TEST_USDC_MINT_MULTISIG ? new PublicKey(env.TEST_USDC_MINT_MULTISIG) : signer.publicKey;
+  const tx = new Transaction().add(createMintToInstruction(mint, getAssociatedTokenAddressSync(mint, owner), authority, AMOUNT,
+    env.TEST_USDC_MINT_MULTISIG ? [signer] : []));
   tx.feePayer = signer.publicKey;
   tx.recentBlockhash = body.blockhash;
   tx.sign(signer);

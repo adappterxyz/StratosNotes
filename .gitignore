@@ -11,3 +11,9 @@ cre/**/node_modules/
 # Demo wallets created by scripts (devnet only); never commit keys.
 .demo-keys/
 .cre_build_tmp.js
+
+# Foundry (evm/): build output, broadcast logs, vendored forge-std (fetch: git clone --depth 1 --branch v1.9.4 https://github.com/foundry-rs/forge-std evm/lib/forge-std)
+evm/out/
+evm/cache/
+evm/broadcast/
+evm/lib/

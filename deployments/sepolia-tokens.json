@@ -1,0 +1,22 @@
+{
+  "tUSD": {
+    "token": "0xaf0bcf447de88494859550e5ee2af20004d82bdd",
+    "pool": "0x067f2ff564d0b84d5800b393f29099c864ef59a1",
+    "decimals": 6
+  },
+  "tETH": {
+    "token": "0xd9eebe920bf15221a3159c157a3973bfa62ff961",
+    "decimals": 18,
+    "pool": "0xd7bdb8b22c6a6b67a47f0c8c10b6c4e3c698530a"
+  },
+  "tBTC": {
+    "token": "0x806ab5b642654898d5e6dfd54030de35ebb84723",
+    "decimals": 8,
+    "pool": "0x4f07189a7138ab7560a19e4f057b201bbbf284d1"
+  },
+  "tSOL": {
+    "token": "0x1f0a3b0a7c4d86b2311d1acbeeb4b40c717cca3d",
+    "decimals": 9,
+    "pool": "0x4d626a50fc94e591328facebcbb58eea22cc5203"
+  }
+}

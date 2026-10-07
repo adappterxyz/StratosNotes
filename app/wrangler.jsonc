@@ -18,7 +18,8 @@
   "ai": { "binding": "AI" },
   "kv_namespaces": [{ "binding": "FAUCET", "id": "c1569994e667444a93855abd7b87f43a" }],
   "vars": {
-    "TEST_USDC": "ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6"
+    "TEST_USDC": "ATn589uY1YL3o7Bz1E3NBguissueVKtQD2tcbHDyNnB6",
+    "TEST_USDC_MINT_MULTISIG": "BSWQ6qPYS54KDHW2v5uJBxRNTRYgpJ7eLfBHz2mwAC9n"
   }
   // Secret: FAUCET_KEY (the test mint's authority, devnet only) — wrangler secret put FAUCET_KEY
 }
