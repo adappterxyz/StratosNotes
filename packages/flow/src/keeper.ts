@@ -16,8 +16,11 @@ export interface RawProcess {
   definition: Uint8Array; // 32 bytes
   id: bigint;
   status: number;
+  /** SPL mint per asset (32 bytes each; all zero for issued assets). */
+  mints: Uint8Array[];
   tokens: number[];
   values: Array<{ tag: number; data: Uint8Array }>;
+  holdings: Array<{ owner: Uint8Array; asset: number; amount: bigint }>;
 }
 
 /** Process account bytes (with discriminator) -> the fields the keeper needs. */
@@ -35,10 +38,18 @@ export function decodeProcess(data: Uint8Array): RawProcess {
   u8(); // bump
   const status = u8();
   bytes(32 * u32()); // roles
-  bytes(32 * u32()); // mints
+  const mints = Array.from({ length: u32() }, () => bytes(32));
   const tokens = Array.from({ length: u32() }, u16);
   const values = Array.from({ length: u32() }, () => ({ tag: u8(), data: bytes(32) }));
-  return { definition, id, status, tokens, values };
+  const holdings = Array.from({ length: u32() }, () => {
+    const owner = bytes(32);
+    const asset = u8();
+    const b = bytes(16);
+    let x = 0n;
+    for (let i = 15; i >= 0; i--) x = (x << 8n) | BigInt(b[i]);
+    return { owner, asset, amount: BigInt.asIntN(128, x) };
+  });
+  return { definition, id, status, mints, tokens, values, holdings };
 }
 
 /** Definition account bytes -> its workflow (null if not sealed). */
@@ -102,4 +113,32 @@ export function reportPayload(process: Uint8Array, step: number, values: bigint[
   new DataView(out.buffer).setUint32(34, values.length, true);
   values.forEach((v, i) => { let x = BigInt.asUintN(128, v); for (let b = 0; b < 16; b++) { out[38 + 16 * i + b] = Number(x & 0xffn); x >>= 8n; } });
   return out;
+}
+
+// ---- Payouts to holders on other chains (CCIP) ----------------------------
+
+/** Report `step` for a payout decision; values = [holder low 16 bytes, high 16 bytes, asset]. */
+export const PAYOUT_STEP = 0xfffe;
+const KIND_CASH = 1;
+
+/** A holder on another chain: [chain + 1][11 zero bytes][EVM address]. */
+export const isRemote = (owner: Uint8Array) => owner[0] > 0 && owner[0] <= 4 && owner.slice(1, 12).every(b => b === 0);
+
+export interface DuePayout { holder: Uint8Array; asset: number; mint: Uint8Array; amount: bigint }
+
+/**
+ * Balances CRE should pay out: every remote holder's positive balance of a
+ * token asset (coupons, redemptions, delivered underlyings, refunds), running
+ * or finished notes alike. Note units stay on Solana.
+ */
+export function duePayouts(p: RawProcess, def: WorkflowDef): DuePayout[] {
+  return p.holdings
+    .filter(h => h.amount > 0n && isRemote(h.owner) && def.assets[h.asset]?.kind === KIND_CASH && p.mints[h.asset]?.some(b => b !== 0))
+    .map(h => ({ holder: h.owner, asset: h.asset, mint: p.mints[h.asset], amount: h.amount }));
+}
+
+/** The report values carrying a payout decision. */
+export function payoutValues(holder: Uint8Array, asset: number): bigint[] {
+  const half = (b: Uint8Array) => { let x = 0n; for (let i = 15; i >= 0; i--) x = (x << 8n) | BigInt(b[i]); return x; };
+  return [half(holder.slice(0, 16)), half(holder.slice(16, 32)), BigInt(asset)];
 }

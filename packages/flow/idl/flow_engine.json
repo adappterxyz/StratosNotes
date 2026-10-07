@@ -384,6 +384,122 @@
       ]
     },
     {
+      "name": "flush_outbox",
+      "docs": [
+        "Anyone: deliver payout `index` from the outbox over CCIP, exactly as CRE",
+        "recorded it (holder's address, token, amount). `remaining_accounts`: the",
+        "router's `ccip_send` accounts in order, then the router program."
+      ],
+      "discriminator": [
+        115,
+        104,
+        215,
+        51,
+        243,
+        219,
+        0,
+        105
+      ],
+      "accounts": [
+        {
+          "name": "outbox",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  117,
+                  116,
+                  98,
+                  111,
+                  120
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ccip_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sender",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  99,
+                  105,
+                  112,
+                  95,
+                  115,
+                  101,
+                  110,
+                  100,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sender_token",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u16"
+        },
+        {
+          "name": "fee_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "init_config",
       "docs": [
         "One-time: the admin and the forwarder programs whose reports are accepted."
@@ -436,6 +552,53 @@
           }
         }
       ]
+    },
+    {
+      "name": "init_outbox",
+      "docs": [
+        "Create the outbox of CRE-decided payouts (once; anyone may pay for it)."
+      ],
+      "discriminator": [
+        111,
+        118,
+        60,
+        202,
+        133,
+        29,
+        74,
+        6
+      ],
+      "accounts": [
+        {
+          "name": "outbox",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  117,
+                  116,
+                  98,
+                  111,
+                  120
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "on_report",
@@ -1123,6 +1286,19 @@
       ]
     },
     {
+      "name": "Outbox",
+      "discriminator": [
+        70,
+        215,
+        144,
+        9,
+        98,
+        225,
+        68,
+        204
+      ]
+    },
+    {
       "name": "Process",
       "discriminator": [
         97,
@@ -1161,6 +1337,19 @@
         161,
         23,
         161
+      ]
+    },
+    {
+      "name": "PayoutQueued",
+      "discriminator": [
+        232,
+        197,
+        43,
+        84,
+        85,
+        157,
+        9,
+        160
       ]
     },
     {
@@ -1375,6 +1564,11 @@
       "code": 6036,
       "name": "NothingToSend",
       "msg": "Nothing to send"
+    },
+    {
+      "code": 6037,
+      "name": "OutboxFull",
+      "msg": "The CCIP outbox is full: flush queued payouts first"
     }
   ],
   "types": [
@@ -1606,6 +1800,92 @@
               "Fixed point, 10 decimals."
             ],
             "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Outbox",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payouts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Payout"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Payout",
+      "docs": [
+        "A payout CRE has decided and locked (see `on_report`, payout kind): the",
+        "tokens already sit in the engine's CCIP sender account; anyone can deliver",
+        "it (`flush_outbox`), only to `holder`'s address, only this amount."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "process",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Base units of the token."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "queued_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayoutQueued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "process",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }

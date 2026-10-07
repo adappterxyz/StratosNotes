@@ -6,7 +6,10 @@ live from a template, and a finished one proves the payouts.
 
 ## Before you present (an hour ahead)
 
-1. **Keeper running.** `pm2 status stratosnotes-keeper` shows `online` (start
+1. **Keeper and CCIP bots running.** `pm2 status` shows `stratosnotes-keeper`,
+   `stratosnotes-ccip-relayer` (delivers Sepolia subscriptions) and
+   `stratosnotes-ccip-payouts` (delivers the payouts CRE locks) `online`.
+   **Keeper running.** `pm2 status stratosnotes-keeper` shows `online` (start
    it with `pm2 start scripts/keeper-loop.sh --name stratosnotes-keeper --interpreter bash`).
    It runs the CRE workflow every minute and broadcasts to devnet.
 2. **A worst-of note in flight, with room for an Ethereum investor.** About 60
@@ -92,10 +95,10 @@ asked: the forwarder program calls the engine's `OnReport`.
 whole life with nobody touching it after issuance. CRE fixed three strikes,
 observed twice, the worst performer stayed above every barrier, it paid two
 coupons and autocalled: 636 and 424 USDC for 600 and 400 units, exactly the
-reference payoff." If the in-flight note has autocalled by now, go back to it:
-in **Holders**, press **Send** next to the Sepolia investor's tUSD (your Solana
-wallet pays the CCIP fee) and switch to tab 7: the payout lands on Ethereum in
-about a minute.
+reference payoff." If the in-flight note has paid by now, switch to tab 7:
+"CRE pays the Ethereum investor too: it locked their coupon for CCIP in a
+signed report, a relay delivered it, and it is here, on Sepolia." (The note's
+**Holders** card lists anything still on its way.)
 
 **4:20 Close (10 s).** "One Solana program runs every note as a BPMN workflow;
 one CRE workflow observes them all; anyone can issue from the library. The

@@ -81,6 +81,14 @@ pub struct CcipReceived {
 }
 
 #[event]
+pub struct PayoutQueued {
+    pub process: Pubkey,
+    pub holder: Pubkey,
+    pub asset: u8,
+    pub amount: u64,
+}
+
+#[event]
 pub struct CcipSent {
     pub process: Pubkey,
     pub holder: Pubkey,

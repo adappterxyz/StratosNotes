@@ -76,4 +76,6 @@ pub enum EngineError {
     BadCcipAccounts,
     #[msg("Nothing to send")]
     NothingToSend,
+    #[msg("The CCIP outbox is full: flush queued payouts first")]
+    OutboxFull,
 }

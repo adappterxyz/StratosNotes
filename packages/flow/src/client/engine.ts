@@ -181,6 +181,27 @@ export class Engine {
       .instruction();
   }
 
+  /** Create the outbox of CRE-decided payouts to other chains (once). */
+  initOutbox() {
+    return this.program.methods.initOutbox().accounts({ payer: this.wallet }).instruction();
+  }
+
+  /** Payouts CRE has locked for CCIP, waiting for any relay to deliver them. */
+  async outbox(): Promise<Array<{ process: PublicKey; holder: PublicKey; mint: PublicKey; asset: number; amount: bigint; queuedAt: number }>> {
+    const key = PublicKey.findProgramAddressSync([new TextEncoder().encode('outbox')], ENGINE_PROGRAM_ID)[0];
+    const o = await this.program.account.outbox.fetchNullable(key) as { payouts: Array<{ process: PublicKey; holder: PublicKey; mint: PublicKey; asset: number; amount: BN; queuedAt: BN }> } | null;
+    return (o?.payouts ?? []).map(x => ({ process: x.process, holder: x.holder, mint: x.mint, asset: x.asset, amount: bnToBig(x.amount), queuedAt: Number(x.queuedAt) }));
+  }
+
+  /** Deliver outbox payout `index` over CCIP (`routerAccounts`: ccipSendAccounts(...) for its mint). */
+  flushOutbox(index: number, mint: PublicKey, feeLamports: bigint, routerAccounts: import('@solana/web3.js').AccountMeta[]) {
+    const sender = PublicKey.findProgramAddressSync([new TextEncoder().encode('ccip_sender')], ENGINE_PROGRAM_ID)[0];
+    return this.program.methods.flushOutbox(index, new BN(feeLamports.toString()))
+      .accountsPartial({ payer: this.wallet, sender, senderToken: getAssociatedTokenAddressSync(mint, sender, true), mint, tokenProgram: TOKEN_PROGRAM_ID })
+      .remainingAccounts(routerAccounts)
+      .instruction();
+  }
+
   async definition(address: PublicKey) {
     const d = await this.program.account.definition.fetch(address) as { sealed: boolean; data: Buffer; hash: number[] };
     return { address, sealed: d.sealed, def: decodeDef(Uint8Array.from(d.data)) };

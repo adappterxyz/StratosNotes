@@ -12,6 +12,11 @@
 //  3. Writes a DON-signed report to the engine through the keystone
 //     forwarder: on_report runs the step and everything after it that needs
 //     nobody (coupons, autocall, redemption), straight through.
+//  4. Pays holders on other chains: for every Sepolia holder with a token
+//     balance (a coupon, a redemption, delivered tokens), a payout report has
+//     the engine lock the amount for CCIP (vault -> its CCIP sender, recorded
+//     in the outbox); any relay then delivers it with flush_outbox, only to
+//     that address and only that amount.
 import {
   bytesToHex, consensusIdenticalAggregation, cre, encodeCallMsg, encodeForwarderReport, calculateAccountsHash, getNetwork,
   LAST_FINALIZED_BLOCK_NUMBER, ok, prepareSolanaReportRequest, Runner, SolanaClient, SolanaTxStatus, solanaAccountMeta,
@@ -19,7 +24,7 @@ import {
 } from '@chainlink/cre-sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'zod'
-import { decodeDefinitionAccount, decodeProcess, dueOracleSteps, feedToFixed, reportPayload, type DueOracle } from '../../packages/flow/src/keeper'
+import { decodeDefinitionAccount, decodeProcess, dueOracleSteps, duePayouts, feedToFixed, PAYOUT_STEP, payoutValues, reportPayload, type DueOracle } from '../../packages/flow/src/keeper'
 
 const configSchema = z.object({
   /** 6-field cron, e.g. "0 * * * * *" = every minute. */
@@ -46,7 +51,11 @@ const configSchema = z.object({
 type Config = z.infer<typeof configSchema>
 
 const PROCESS_DISCRIMINATOR_B64 = 'YZCwotTlC8c=' // sha256("account:Process")[..8]
-const STATUS_OFFSET = 81 // discriminator 8 | definition 32 | id 8 | creator 32 | bump 1 | status
+const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+const ATA_PROGRAM = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+
+/** A payout to a holder on another chain, as the DON agreed on it. */
+interface DuePayoutJob { process: string; definition: string; holder: string; asset: number; mint: string; amount: string }
 
 // QuickJS has no atob/Buffer: decode base64 by hand.
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -78,9 +87,10 @@ const findDue = (sendRequester: HTTPSendRequester, cfg: Config['solana'], nowSec
     if (j.error) throw new Error(`${method}: ${JSON.stringify(j.error)}`)
     return j.result
   }
+  // Every process: running ones for oracle steps, finished ones too for payouts owed to other chains.
   const procs = rpc('getProgramAccounts', [cfg.engineProgramId, {
     encoding: 'base64', commitment: 'finalized',
-    filters: [{ memcmp: { offset: 0, bytes: PROCESS_DISCRIMINATOR_B64, encoding: 'base64' } }, { memcmp: { offset: STATUS_OFFSET, bytes: 'AA==', encoding: 'base64' } }],
+    filters: [{ memcmp: { offset: 0, bytes: PROCESS_DISCRIMINATOR_B64, encoding: 'base64' } }],
   }]) as Array<{ pubkey: string; account: { data: [string, string] } }>
   const decoded = procs.map(p => ({ key: p.pubkey, p: decodeProcess(b64(p.account.data[0])) }))
   const defKeys = [...new Set(decoded.map(d => new PublicKey(d.p.definition).toBase58()))].sort()
@@ -90,13 +100,17 @@ const findDue = (sendRequester: HTTPSendRequester, cfg: Config['solana'], nowSec
     defKeys.forEach((k, i) => defs.set(k, infos[i] ? decodeDefinitionAccount(b64(infos[i]!.data[0])) : null))
   }
   const due: DueOracle[] = []
+  const payouts: DuePayoutJob[] = []
   for (const { key, p } of decoded.sort((a, b) => (a.key < b.key ? -1 : 1))) {
     const dk = new PublicKey(p.definition).toBase58()
     const def = defs.get(dk)
     if (!def) continue
     for (const d of dueOracleSteps(p, def, nowSec)) due.push({ ...d, process: key, definition: dk })
+    for (const d of duePayouts(p, def)) {
+      payouts.push({ process: key, definition: dk, holder: new PublicKey(d.holder).toBase58(), asset: d.asset, mint: new PublicKey(d.mint).toBase58(), amount: d.amount.toString() })
+    }
   }
-  return JSON.stringify(due)
+  return JSON.stringify({ due, payouts })
 }
 
 function bytesToB64(b: Uint8Array): string {
@@ -134,10 +148,10 @@ export const onCron = (runtime: Runtime<Config>): string => {
   const cfg = runtime.config
   const nowSec = Math.floor(runtime.now().getTime() / 1000)
   const http = new cre.capabilities.HTTPClient()
-  const due = JSON.parse(
+  const { due, payouts } = JSON.parse(
     http.sendRequest(runtime, findDue, consensusIdenticalAggregation<string>())(cfg.solana, nowSec).result(),
-  ) as DueOracle[]
-  runtime.log(`due oracle steps: ${due.length}`)
+  ) as { due: DueOracle[]; payouts: DuePayoutJob[] }
+  runtime.log(`due oracle steps: ${due.length}, payouts to other chains: ${payouts.length}`)
 
   const network = getNetwork({ chainFamily: 'solana', chainSelectorName: cfg.solana.chainSelectorName })
   if (!network) throw new Error('unknown Solana chain ' + cfg.solana.chainSelectorName)
@@ -179,7 +193,41 @@ export const onCron = (runtime: Runtime<Config>): string => {
     runtime.log(`${d.process} ${d.stepId} [${values.join(',')}] -> ${ok ? 'written' : 'failed: ' + (resp.errorMessage || resp.txStatus)}`)
     if (ok) done.push(`${d.process}:${d.stepId}`)
   }
-  return JSON.stringify({ due: due.length, written: done })
+  // Payouts to holders on other chains: lock each for CCIP (the engine moves the tokens to its CCIP
+  // sender and records the payout in the outbox; any relay delivers it with flush_outbox).
+  const pda = (seeds: Uint8Array[], program = engine) => PublicKey.findProgramAddressSync(seeds, program)[0]
+  const enc = (s: string) => new TextEncoder().encode(s)
+  const ccipConfig = pda([enc('ccip_config')]), outbox = pda([enc('outbox')]), sender = pda([enc('ccip_sender')])
+  for (const po of payouts.slice(0, Math.max(0, cfg.maxReportsPerRun - done.length))) {
+    const mint = new PublicKey(po.mint)
+    const senderToken = pda([sender.toBytes(), TOKEN_PROGRAM.toBytes(), mint.toBytes()], ATA_PROGRAM)
+    const vault = pda([enc('vault'), new PublicKey(po.process).toBytes(), Uint8Array.of(po.asset)])
+    const accounts = [
+      solanaAccountMeta(cfg.solana.forwarderState, true),
+      solanaAccountMeta(authority.toBase58()),
+      solanaAccountMeta(config.toBase58()),
+      solanaAccountMeta(po.process, true),
+      solanaAccountMeta(po.definition),
+      solanaAccountMeta(ccipConfig.toBase58()),
+      solanaAccountMeta(outbox.toBase58(), true),
+      solanaAccountMeta(sender.toBase58()),
+      solanaAccountMeta(senderToken.toBase58(), true),
+      solanaAccountMeta(vault.toBase58(), true),
+      solanaAccountMeta(TOKEN_PROGRAM.toBase58()),
+    ]
+    const payload = reportPayload(solanaAddressToBytes(po.process), PAYOUT_STEP, payoutValues(new PublicKey(po.holder).toBytes(), po.asset))
+    const report = runtime.report(prepareSolanaReportRequest(encodeForwarderReport({ accountHash: calculateAccountsHash(accounts), payload }))).result()
+    const resp = solana.writeReport(runtime, {
+      remainingAccounts: solanaAccountMetasToJson(accounts),
+      receiver: bytesToHex(engine.toBytes()),
+      computeConfig: { computeLimit: cfg.solana.computeLimit },
+      report,
+    }).result()
+    const ok = resp.txStatus === SolanaTxStatus.SUCCESS
+    runtime.log(`${po.process} payout asset ${po.asset} to ${po.holder} (${po.amount}) -> ${ok ? 'locked for CCIP' : 'failed: ' + (resp.errorMessage || resp.txStatus)}`)
+    if (ok) done.push(`${po.process}:payout:${po.holder}:${po.asset}`)
+  }
+  return JSON.stringify({ due: due.length, payouts: payouts.length, written: done })
 }
 
 export const initWorkflow = (config: Config) => [

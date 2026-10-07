@@ -6,15 +6,17 @@
  *  - a subscription that lands after the book closed is refunded, not lost;
  *  - CRE autocalls the note; the remote investor's coupon and redemption
  *    accrue in the ledger like anyone's;
- *  - `withdraw_remote` sends the investor's cash back over the router's
- *    `ccip_send`, to their EVM address.
+ *  - CRE pays the investor on Sepolia: a payout report (through the
+ *    forwarder) locks the cash for CCIP in the outbox, and any relay delivers
+ *    it with `flush_outbox` through the router's `ccip_send`;
+ *  - `withdraw_remote` refuses when nothing is left, and local holders.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { AnchorProvider, BorshCoder, EventParser, Program, Wallet } from '@coral-xyz/anchor';
 import { ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from '@solana/web3.js';
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount, createAccount } from '@solana/spl-token';
 import {
-  ccipPda, ccipSendAccounts, compile, dec, encodeReport, encodeRun, Engine, ENGINE_IDL, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, instantiateProduct,
+  ccipPda, ccipSendAccounts, compile, PAYOUT_STEP, payoutValues, dec, encodeReport, encodeRun, Engine, ENGINE_IDL, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, instantiateProduct,
   MOCK_FORWARDER_IDL, OPEN_ROLE, parseBpmn, pda, receiveAccounts, remoteKey, reservePerUnit, SCALE, slot, CCIP,
 } from '../src';
 import { e2eAdmin } from './e2e-admin';
@@ -154,7 +156,33 @@ describe.skipIf(!RPC)('cross-chain notes over CCIP (local validator, mock CCIP)'
     const owed = st.holdings.find(h => h.owner.equals(remote) && h.asset === CASH)!.amount;
     expect(Number(owed) / Number(SCALE)).toBeCloseTo(100 + 300 * 1.02, 6); // refund + par + coupon
 
-    // 4. Anyone sends it back to Sepolia: the router's ccip_send pulls exactly that from the sender PDA.
+    // 4. CRE decides the payout: a report locks it for CCIP (vault -> the engine's CCIP sender, outbox entry).
+    const outboxKey = PublicKey.findProgramAddressSync([new TextEncoder().encode('outbox')], ENGINE_PROGRAM_ID)[0];
+    if (!(await conn.getAccountInfo(outboxKey))) await eng.send([await eng.initOutbox()]);
+    const [fwdAuthority] = PublicKey.findProgramAddressSync([new TextEncoder().encode('forwarder'), forwarderState.publicKey.toBytes(), ENGINE_PROGRAM_ID.toBytes()], MOCK_ID);
+    const vaultKey = pda.vault(process, CASH);
+    await mock.methods.forward(Buffer.alloc(0), Buffer.from(encodeReport(process.toBytes(), PAYOUT_STEP, payoutValues(remote.toBytes(), CASH))))
+      .accounts({ state: forwarderState.publicKey, authority: fwdAuthority, receiver: ENGINE_PROGRAM_ID })
+      .remainingAccounts([
+        { pubkey: pda.config(), isSigner: false, isWritable: false },
+        { pubkey: process, isSigner: false, isWritable: true },
+        { pubkey: definition, isSigner: false, isWritable: false },
+        { pubkey: ccipPda.config(ENGINE_PROGRAM_ID), isSigner: false, isWritable: false },
+        { pubkey: outboxKey, isSigner: false, isWritable: true },
+        { pubkey: ccipPda.sender(ENGINE_PROGRAM_ID), isSigner: false, isWritable: false },
+        { pubkey: senderAta, isSigner: false, isWritable: true },
+        { pubkey: vaultKey, isSigner: false, isWritable: true },
+        { pubkey: (await import('@solana/spl-token')).TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      ]).preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 })]).rpc();
+    st = await issuer.process(process);
+    expect(st.holdings.find(h => h.owner.equals(remote) && h.asset === CASH)?.amount ?? 0n).toBe(0n);
+    const queued = (await eng.outbox()).filter(o => o.process.equals(process));
+    expect(queued).toHaveLength(1);
+    expect(queued[0].holder.equals(remote)).toBe(true);
+    expect(Number(queued[0].amount) / 1e6).toBeCloseTo(406, 6);
+    expect(Number((await getAccount(conn, senderAta)).amount) / 1e6).toBeCloseTo(406, 6);
+
+    // 5. Any relay delivers it: the router's ccip_send pulls exactly that from the sender PDA.
     const sink = await createAccount(conn, admin, usdc, Keypair.generate().publicKey, Keypair.generate());
     const routerAccounts = ccipSendAccounts({
       engine: ENGINE_PROGRAM_ID, mint: usdc, destSelector: SEPOLIA,
@@ -163,13 +191,13 @@ describe.skipIf(!RPC)('cross-chain notes over CCIP (local validator, mock CCIP)'
     });
     const cranker = await funded(2);
     const crank = new Engine(provider(cranker));
+    const index = (await eng.outbox()).findIndex(o => o.process.equals(process));
     await crank.send([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
-      await crank.withdrawRemote(process, definition, remote, CASH, usdc, 10_000_000n, routerAccounts),
+      await crank.flushOutbox(index, usdc, 10_000_000n, routerAccounts),
     ]);
-    st = await issuer.process(process);
-    expect(st.holdings.find(h => h.owner.equals(remote) && h.asset === CASH)?.amount ?? 0n).toBe(0n);
     expect(Number((await getAccount(conn, sink)).amount) / 1e6).toBeCloseTo(406, 6);
+    expect((await eng.outbox()).filter(o => o.process.equals(process))).toHaveLength(0);
     // Nothing else can be sent for this holder now.
     await expect(crank.send([await crank.withdrawRemote(process, definition, remote, CASH, usdc, 0n, routerAccounts)])).rejects.toThrow(/NothingToSend|Nothing to send/);
     // A local holder is not remote.

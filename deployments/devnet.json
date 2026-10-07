@@ -74,6 +74,23 @@
         600,
         400
       ]
+    },
+    {
+      "type": "phoenix",
+      "name": "12M Phoenix (memory) on ETH",
+      "process": "8DtC17ArCQiCPiGezSB1dYfViA3SAoKTE7JynGX7gHe2",
+      "definition": "8XjgXeXQpaRfoifLJj3nQcBHSrmr1gGcoJXBJp5gtTV9",
+      "strikeAt": 1791362410,
+      "observations": [
+        1791362530,
+        1791362650,
+        1791362770,
+        1791362890
+      ],
+      "investors": [
+        600,
+        400
+      ]
     }
   ],
   "ccip": {
@@ -101,6 +118,7 @@
         "sender": "4gZEzjp4CpuA8X1MLxotRiqm1EpEtChgfk2m1UjF5nR8"
       }
     },
-    "lookupTable": "AjDHbzZu8ag1wBzk1ZUGx6NxuJcDbHZhw8AZTuZG1GJn"
+    "lookupTable": "AjDHbzZu8ag1wBzk1ZUGx6NxuJcDbHZhw8AZTuZG1GJn",
+    "outbox": "BfQcuQySLBTB9o9xR8MsC9PyDPCjwb2bMREhwKPPgTVE"
   }
 }

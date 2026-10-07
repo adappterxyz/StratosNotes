@@ -1,12 +1,13 @@
 /**
  * Who holds what in a note: note units, cash and delivered tokens, on Solana
- * or on Sepolia (remote holders, who subscribed over CCIP). A Sepolia
- * holder's balances go home over CCIP; anyone can send them (their Solana
- * wallet pays the CCIP fee in SOL).
+ * or on Sepolia (remote holders, who subscribed over CCIP). Chainlink CRE pays
+ * Sepolia holders automatically: each keeper run locks their balances for
+ * CCIP (the outbox) and a relay delivers them. "Send now" does it at once.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { ExternalLink, Send } from 'lucide-react';
+import { PublicKey } from '@solana/web3.js';
 import { remoteOf, SCALE } from '@stratosnotes/flow';
 import { explorer, SEPOLIA, tokenByMint } from '../config';
 import { useEngine } from '../lib/engine';
@@ -19,6 +20,13 @@ export default function HoldersPanel({ o, onDone }: { o: Offering; onDone: () =>
   const { engine } = useEngine();
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string; sig?: string } | null>(null);
+  // Payouts CRE has locked for this note, on their way over CCIP.
+  const [outbox, setOutbox] = useState<Array<{ holder: string; mint: string; amount: bigint; queuedAt: number }>>([]);
+  useEffect(() => {
+    let live = true;
+    engine.outbox().then(list => { if (live) setOutbox(list.filter(x => x.process.equals(o.address)).map(x => ({ holder: x.holder.toBase58(), mint: x.mint.toBase58(), amount: x.amount, queuedAt: x.queuedAt }))); }).catch(() => {});
+    return () => { live = false; };
+  }, [engine, o.address, o.process.updatedAt]);
 
   const label = (asset: number) => asset === NOTE ? 'units' : tokenByMint(o.process.mints[asset].toBase58())?.symbol ?? o.def.assets[asset]?.name ?? `asset ${asset}`;
   const owners = [...new Set(o.process.holdings.filter(h => h.amount > 0n).map(h => h.owner.toBase58()))];
@@ -47,6 +55,7 @@ export default function HoldersPanel({ o, onDone }: { o: Offering; onDone: () =>
   return (
     <section className="card">
       <div className="spread"><h3>Holders</h3><span className="xs muted">Solana and Sepolia (CCIP)</span></div>
+      {rows.some(r => r.remote) && <p className="xs muted">Sepolia holders are paid automatically: Chainlink CRE locks their coupons and redemption for CCIP within a minute or two, and they arrive on Sepolia about a minute later.</p>}
       <div className="scroll-x">
         <table className="t">
           <thead><tr><th>Holder</th><th className="r">Balances</th></tr></thead>
@@ -65,7 +74,7 @@ export default function HoldersPanel({ o, onDone }: { o: Offering; onDone: () =>
                       <span className="num small">{fmtMoney(Number(h.amount) / Number(SCALE), h.asset === NOTE ? 0 : 4)} {label(h.asset)}</span>
                       {r.remote && h.asset !== NOTE && (
                         <button className="btn" style={{ padding: '2px 8px' }} disabled={!publicKey || !!busy} onClick={() => send(r, h.asset)} title="Send to this holder's Sepolia address over CCIP (your Solana wallet pays the fee)">
-                          <Send className="i" style={{ width: 12, height: 12 }} />{busy === `${r.key.toBase58()}:${h.asset}` ? 'Sending…' : 'Send'}
+                          <Send className="i" style={{ width: 12, height: 12 }} />{busy === `${r.key.toBase58()}:${h.asset}` ? 'Sending…' : 'Send now'}
                         </button>
                       )}
                     </div>
@@ -76,6 +85,16 @@ export default function HoldersPanel({ o, onDone }: { o: Offering; onDone: () =>
           </tbody>
         </table>
       </div>
+      {outbox.length > 0 && (
+        <div className="stack" style={{ gap: 4, borderTop: '1px solid hsl(var(--border))', paddingTop: 8 }}>
+          <span className="label">On the way to Sepolia (locked by CRE)</span>
+          {outbox.map((x, i) => {
+            const r = remoteOf(new PublicKey(x.holder));
+            const t = tokenByMint(x.mint);
+            return <div key={i} className="spread xs"><span className="num">{r ? `${r.address.slice(0, 6)}…${r.address.slice(-4)}` : short(x.holder)}</span><span className="num">{(Number(x.amount) / 10 ** (t?.solana.decimals ?? 6)).toFixed(4)} {t?.symbol ?? ''}</span></div>;
+          })}
+        </div>
+      )}
       {msg && <div className={`notice ${msg.kind}`} role="status">{msg.text} {msg.sig && <a href={`https://ccip.chain.link/tx/${msg.sig}`} target="_blank" rel="noreferrer">Follow on CCIP <ExternalLink className="i" style={{ width: 11, height: 11 }} /></a>}</div>}
     </section>
   );

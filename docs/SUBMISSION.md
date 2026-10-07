@@ -18,7 +18,7 @@ date and triggers every coupon, autocall and redemption.
 |---|---|
 | **Best Use of Solana** | One Anchor program, `flow_engine`, runs BPMN workflows on-chain. A compiled workflow is stored once (addressed by its hash) and every issuance is a process of it: a token-multiset state machine with exclusive gateways on price predicates (including `min`/`max` for worst-of baskets), parallel fork/join, timers on per-issuance dates, open roles, repeatable subscription windows, an internal holdings ledger with atomic USDC-for-note DvP, distribute-to-every-holder, holder transfers in whole or in part, and a USDC vault per issuance. Five product engines, worst-of baskets, the template library and any workflow edited on the canvas all run on the same program. The app reads everything from chain and follows each note's account over a WebSocket, so pages update the moment a report lands. |
 | **Cross-chain (Chainlink CCIP)** | Investors on Ethereum Sepolia subscribe to a Solana note by sending tUSD and a "subscribe" call over CCIP; the engine receives it (`ccip_receive`), runs the subscription for their Ethereum address, and later sends coupons, redemptions and physically delivered tokens back with the CCIP router's `ccip_send`. Four cross-chain tokens (tUSD, tETH, tBTC, tSOL) are self-registered CCIP burn-mint tokens on both chains. A full lifecycle ran across both testnets (below). |
-| **Best Workflow with CRE** | `cre/notes-keeper`: one CRE workflow serves every note on the platform. Each cron run reads the engine's running processes from Solana (every DON node reads finalized state; the DON agrees on what is due), reads the Chainlink feed of every underlying named in each workflow at the finalized Ethereum block (staleness-checked against the feed's heartbeat; each feed read once per run), and writes a DON-signed report to Solana through the keystone forwarder (`SolanaClient.writeReport`). A worst-of note's report carries all its prices at once. The engine accepts prices only from Chainlink's forwarder programs and bounds-checks them; one report runs the observation and everything after it. Every report fits CRE's 300k compute cap (max 99k measured, three feeds in one report). |
+| **Best Workflow with CRE** | `cre/notes-keeper`: one CRE workflow serves every note on the platform. Each cron run reads the engine's running processes from Solana (every DON node reads finalized state; the DON agrees on what is due), reads the Chainlink feed of every underlying named in each workflow at the finalized Ethereum block (staleness-checked against the feed's heartbeat; each feed read once per run), and writes a DON-signed report to Solana through the keystone forwarder (`SolanaClient.writeReport`). It is also the paying agent for investors on Ethereum: for every Sepolia holder with a coupon or redemption due, a DON-signed payout report has the engine lock the amount for CCIP, and a permissionless relay delivers it to that address. A worst-of note's report carries all its prices at once. The engine accepts prices only from Chainlink's forwarder programs and bounds-checks them; one report runs the observation and everything after it. Every report fits CRE's 300k compute cap (max 99k measured, three feeds in one report). |
 
 ## The problem
 
@@ -139,7 +139,11 @@ CCIP (Sepolia tx `0xff7248630d184bc2abe4ee9a44fed4d066f1fe340560005f8bdb50086fe2
 CRE fixed the strike and autocalled at observation 1; `withdraw_remote` sent
 the investor's 306 tUSD back through the CCIP router (Solana tx
 `4jEafTtRiMW38eP2QDtduW1PdeVaM1H4G9QynDqXtLzYYQbp3hcX8vpubQ5mW2CQoE8K2LLRVPYUpQoBCFJFq6BB`),
-landing on Sepolia 50 seconds later. Every step and its transaction:
+landing on Sepolia 50 seconds later. Then automatic: on phoenix
+`8DtC17ArCQiCPiGezSB1dYfViA3SAoKTE7JynGX7gHe2`, where 100 units had moved to
+the same Ethereum address, CRE locked each coupon and the redemption for CCIP
+in a DON-signed payout report as they fell due, a relay delivered them, and
+110 tUSD reached Sepolia with nobody acting. Every step and its transaction:
 [crosschain.md](crosschain.md).
 
 **The template library, seeded.** Six templates are published on devnet and
@@ -208,9 +212,9 @@ workflow changes.
   Prices come from Chainlink feeds on Ethereum mainnet. The traded assets are
   testnet tokens: tUSD for cash and tETH, tBTC, tSOL for physical delivery
   (CCIP cross-chain tokens we registered), not the real assets.
-- Sepolia holders receive payouts when someone sends them home
-  (`withdraw_remote`, a button on the note page; the caller pays the CCIP fee
-  in SOL); it is not automatic yet.
+- CRE decides Sepolia payouts, but cannot submit the CCIP send itself (the
+  router's accounts need address lookup tables, which CRE's Solana writes do
+  not support), so a relay delivers what CRE locked; anyone can run it.
 - An edited workflow's payoff is the workflow itself: the app charts a
   reference payoff only for unedited products, and the issuer sizes the
   reserve for anything the edit adds (the fee template deposits its fees for
@@ -225,8 +229,7 @@ workflow changes.
 - Note units as SPL tokens (Token-2022 with the engine as permanent delegate)
   for wallet visibility and secondary markets, transferable across chains over
   CCIP.
-- Automatic payouts to Sepolia holders (the keeper sending them home after
-  each coupon), more CCIP chains (Base, Arbitrum), and a smaller CCIP receiver
-  footprint so the DON executor delivers subscriptions without the relayer.
+- More CCIP chains (Base, Arbitrum), and a smaller CCIP receiver footprint so
+  the DON executor delivers subscriptions without the relayer.
 - Per-offering investor allowlists, template ratings and issuer profiles, and
   Flow's Canton target for private institutional issuance from the same BPMN.

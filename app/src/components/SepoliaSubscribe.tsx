@@ -71,7 +71,7 @@ export default function SepoliaSubscribe({ o, now, onSent }: { o: Offering; now:
   return (
     <section className="card">
       <div className="spread"><h3>Subscribe from Ethereum Sepolia</h3><span className="pill plain">CCIP</span></div>
-      <p className="xs muted">Pay in tUSD on Sepolia; Chainlink CCIP carries it and your subscription to this note on Solana in about 30 minutes. Coupons and the redemption are sent back to your Sepolia address.</p>
+      <p className="xs muted">Pay in tUSD on Sepolia; Chainlink CCIP carries it and your subscription to this note on Solana in about 30 minutes. Chainlink CRE pays your coupons and redemption back to your Sepolia address automatically.</p>
       {tooLate ? (
         <div className="notice warn">The book closes {fmtDate(o.strikeDate)}: too soon for a Sepolia subscription to arrive. Subscribe on Solana instead.</div>
       ) : !hasEvmWallet() ? (

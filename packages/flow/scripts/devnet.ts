@@ -129,6 +129,9 @@ async function ccip() {
   const tokens = JSON.parse(readFileSync(join(ROOT, 'deployments/solana-tokens.json'), 'utf8')) as Record<string, { mint: string }>;
   const e = engineFor(payer);
   await e.send([await e.setCcip(CCIP.devnet.router, [CCIP.sepolia.selector])]);
+  // The outbox of payouts CRE locks for holders on other chains.
+  const outbox = PublicKey.findProgramAddressSync([new TextEncoder().encode('outbox')], ENGINE_PROGRAM_ID)[0];
+  if (!(await conn.getAccountInfo(outbox))) await e.send([await e.initOutbox()]);
   const inbox = ccipPda.inbox(ENGINE_PROGRAM_ID), sender = ccipPda.sender(ENGINE_PROGRAM_ID);
   const accounts: Record<string, { inbox: string; sender: string }> = {};
   for (const [sym, t] of Object.entries(tokens)) {
@@ -138,7 +141,7 @@ async function ccip() {
       sender: (await getOrCreateAssociatedTokenAccount(conn, payer, mint, sender, true)).address.toBase58(),
     };
   }
-  s.ccip = { router: CCIP.devnet.router.toBase58(), chains: { sepolia: CCIP.sepolia.selector.toString() }, inbox: inbox.toBase58(), sender: sender.toBase58(), tokenAccounts: accounts };
+  s.ccip = { ...s.ccip, outbox: outbox.toBase58(), router: CCIP.devnet.router.toBase58(), chains: { sepolia: CCIP.sepolia.selector.toString() }, inbox: inbox.toBase58(), sender: sender.toBase58(), tokenAccounts: accounts };
   save(s);
   console.log(JSON.stringify(s.ccip, null, 2));
 }

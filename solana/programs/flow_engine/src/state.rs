@@ -7,6 +7,7 @@ pub const MAX_HOLDINGS: usize = 64;
 pub const MAX_ASSETS: usize = 8;
 pub const MAX_FORWARDERS: usize = 4;
 pub const MAX_CCIP_CHAINS: usize = 4;
+pub const MAX_OUTBOX: usize = 32;
 
 /// Program-wide settings: who may deliver CRE reports.
 #[account]
@@ -34,6 +35,30 @@ pub struct CcipConfig {
 
 impl CcipConfig {
     pub const SPACE: usize = 8 + 32 + 4 + 8 * MAX_CCIP_CHAINS + 1;
+}
+
+/// A payout CRE has decided and locked (see `on_report`, payout kind): the
+/// tokens already sit in the engine's CCIP sender account; anyone can deliver
+/// it (`flush_outbox`), only to `holder`'s address, only this amount.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug)]
+pub struct Payout {
+    pub process: Pubkey,
+    pub holder: Pubkey,
+    pub mint: Pubkey,
+    pub asset: u8,
+    /// Base units of the token.
+    pub amount: u64,
+    pub queued_at: i64,
+}
+
+#[account]
+pub struct Outbox {
+    pub payouts: Vec<Payout>,
+    pub bump: u8,
+}
+
+impl Outbox {
+    pub const SPACE: usize = 8 + 4 + (32 * 3 + 1 + 8 + 8) * MAX_OUTBOX + 1;
 }
 
 /// A holder on another chain: `[chain index + 1][11 zero bytes][20-byte EVM address]`.

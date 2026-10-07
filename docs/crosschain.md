@@ -122,3 +122,33 @@ report verification. `scripts/ccip-relayer.sh` (pm2:
 `stratosnotes-ccip-relayer`) watches the Sepolia OnRamp for messages to the
 engine and manually executes any that fail, so subscriptions land without
 anyone acting; inbound latency is then about 35-40 minutes.
+
+## Automatic payouts to Sepolia: CRE decides, a relay delivers
+
+Chainlink CRE is the paying agent for holders on other chains too. Each run of
+the keeper (`cre/notes-keeper`) finds every Sepolia holder with a token
+balance (a coupon, a redemption, delivered tokens, a refunded late
+subscription) and writes a DON-signed **payout report**
+(`step = 0xFFFE`, values = the holder and the asset). The engine debits the
+holder, moves the tokens from the note's vault to its CCIP sender account and
+records the payout in the **outbox** (`Outbox` PDA). Any relay then delivers it
+with `flush_outbox`, which calls the CCIP router's `ccip_send` with exactly
+what CRE recorded: that address, that token, that amount.
+
+CRE cannot submit the CCIP send itself: the router needs about 40 accounts,
+which only fit a transaction through address lookup tables, and CRE's Solana
+writes (`WriteReportRequest`) take a plain account list. The payout report
+needs 11 accounts and about 40k compute units.
+
+The relay (`packages/flow/scripts/ccip-payouts.ts`, pm2:
+`stratosnotes-ccip-payouts`) decides nothing and can be run by anyone; it tops
+up the engine's CCIP sender with SOL for fees when it runs low.
+
+Live (2026-10-07): phoenix `8DtC17ArCQiCPiGezSB1dYfViA3SAoKTE7JynGX7gHe2`; a Solana
+investor transferred 100 units to the Ethereum address `0x8ba8…2568`. CRE
+locked the three 2.5% coupons and the final 102.5 as they were paid (four
+payout reports), the relay delivered each over CCIP, and the address's Sepolia
+tUSD went from 306 to 416 (+110, the reference payoff), with nobody acting.
+First delivery: locked 08:43:48, sent 08:43:57
+(`2weGxh8Qcyjhj7CcAwmFqcvNpYB5uaVJ1q6AbQLpGbjaxPXt6NkSkjbdv6jakGrEEkj2mLnWFDizBBBeNHKGWW8b`);
+redemption: `2C9Nn9R66qEPnQ1P2VGcyU5pdKHqXBsgGhk1LV7pHgTPwd8ti775aRmT3YmyKezs7bEvvu6auByzfRmpogfMGCZc`.
