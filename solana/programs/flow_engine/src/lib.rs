@@ -14,6 +14,7 @@ pub mod def;
 pub mod errors;
 pub mod exec;
 pub mod expr;
+pub mod heap;
 pub mod state;
 
 use def::*;

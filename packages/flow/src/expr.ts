@@ -4,7 +4,8 @@
  *
  *   expr    := term (('+' | '-') term)*
  *   term    := factor (('*' | '/') factor)*
- *   factor  := NUMBER | IDENT | '(' expr ')' | '-' factor
+ *   factor  := NUMBER | IDENT | FN '(' expr (',' expr)+ ')' | '(' expr ')' | '-' factor
+ *   FN      := 'min' | 'max'   (e.g. worst-of: min(eth / ethStrike, btc / btcStrike))
  *   pred    := cmpChain (('or' | '||') cmpChain)*      ('and' binds tighter)
  *   cmpChain:= cmp (('and' | '&&') cmp)*
  *   cmp     := expr OP expr      OP in > < >= <= == !=
@@ -15,7 +16,8 @@ export type ExprAst =
   | { k: 'num'; v: string }
   | { k: 'ref'; name: string }
   | { k: 'neg'; a: ExprAst }
-  | { k: 'bin'; op: '+' | '-' | '*' | '/'; a: ExprAst; b: ExprAst };
+  | { k: 'bin'; op: '+' | '-' | '*' | '/'; a: ExprAst; b: ExprAst }
+  | { k: 'fn'; f: 'min' | 'max'; a: ExprAst; b: ExprAst };
 
 export type PredAst =
   | { k: 'cmp'; op: '>' | '<' | '>=' | '<=' | '==' | '!='; a: ExprAst; b: ExprAst }
@@ -50,7 +52,28 @@ export function parseExpr(src: string): Parsed<ExprAst> {
     const num = /^[0-9]+(\.[0-9]+)?/.exec(s.slice(i));
     if (num) { i += num[0].length; return { k: 'num', v: num[0] }; }
     const id = /^[a-zA-Z_][a-zA-Z0-9_]*/.exec(s.slice(i));
-    if (id) { i += id[0].length; refs.add(id[0]); return { k: 'ref', name: id[0] }; }
+    if (id) {
+      i += id[0].length;
+      ws();
+      if ((id[0] === 'min' || id[0] === 'max') && s[i] === '(') {
+        i++;
+        const args: ExprAst[] = [];
+        for (;;) {
+          const e = expr();
+          if (!e) return null;
+          args.push(e);
+          ws();
+          if (s[i] === ',') { i++; continue; }
+          if (s[i] === ')') { i++; break; }
+          return fail(`expected ',' or ')' in ${id[0]}(...)`);
+        }
+        if (args.length < 2) return fail(`${id[0]}(...) needs at least two values`);
+        const f = id[0] as 'min' | 'max';
+        return args.slice(1).reduce<ExprAst>((a, b) => ({ k: 'fn', f, a, b }), args[0]);
+      }
+      refs.add(id[0]);
+      return { k: 'ref', name: id[0] };
+    }
     return fail(`unexpected character '${c}'`);
   }
   function term(): ExprAst | null {
@@ -146,6 +169,7 @@ export type { Op } from './op';
 import type { Op } from './op';
 
 const BIN: Record<string, number> = { '+': 2, '-': 3, '*': 4, '/': 5 };
+const FN: Record<string, number> = { min: 16, max: 17 };
 const CMPC: Record<string, number> = { '<': 7, '<=': 8, '>': 9, '>=': 10, '==': 11, '!=': 12 };
 
 /** Compile to RPN; `fieldIndex` resolves a field name (throws if unknown). */
@@ -159,6 +183,7 @@ export function compileExpr(ast: ExprAst, fieldIndex: (name: string) => number):
     }
     else if (n.k === 'ref') out.push({ code: 1, field: fieldIndex(n.name), value: 0n });
     else if (n.k === 'neg') { walk(n.a); out.push({ code: 6, field: 0, value: 0n }); }
+    else if (n.k === 'fn') { walk(n.a); walk(n.b); out.push({ code: FN[n.f], field: 0, value: 0n }); }
     else { walk(n.a); walk(n.b); out.push({ code: BIN[n.op], field: 0, value: 0n }); }
   };
   walk(ast);

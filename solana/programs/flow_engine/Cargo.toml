@@ -10,7 +10,9 @@ crate-type = ["cdylib", "lib"]
 name = "flow_engine"
 
 [features]
-default = []
+# custom-heap: replace Solana's default allocator with src/heap.rs.
+default = ["custom-heap"]
+custom-heap = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-idl = []

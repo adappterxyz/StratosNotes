@@ -24,7 +24,7 @@ interface Draft {
   name: string | null;
   size: number | null;
   issuePricePct: number | null;
-  underlyingSymbol: string | null;
+  underlyingSymbols: string[] | null;
   observationEveryMonths: number | null;
   observationCount: number | null;
   couponRatePct: number | null;
@@ -48,7 +48,7 @@ const SCHEMA = {
     name: { type: ['string', 'null'], description: 'Short display name, e.g. "12M Phoenix on ETH"' },
     size: { ...num, description: 'Issuance size in USDC of face' },
     issuePricePct: { ...num, description: 'Issue price, % of face' },
-    underlyingSymbol: { type: ['string', 'null'], description: 'Ticker, e.g. ETH, BTC, SOL' },
+    underlyingSymbols: { type: ['array', 'null'], items: { type: 'string' }, description: 'Tickers, e.g. ["ETH"]; several for a worst-of basket, e.g. ["ETH", "BTC"]' },
     observationEveryMonths: { type: ['integer', 'null'] },
     observationCount: { type: ['integer', 'null'], description: 'Number of observations; the last one is maturity' },
     couponRatePct: { ...num, description: 'The coupon rate exactly as stated, % of face' },
@@ -62,7 +62,7 @@ const SCHEMA = {
     protectionPct: { ...num, description: 'Capital protection, % of face' },
     participationPct: num,
   },
-  required: ['productType', 'name', 'size', 'issuePricePct', 'underlyingSymbol', 'observationEveryMonths', 'observationCount', 'couponRatePct', 'couponAsStated', 'couponRateBasis', 'couponBarrierPct', 'memory', 'autocallLevelPct', 'autocallFromPeriod', 'knockInBarrierPct', 'protectionPct', 'participationPct'],
+  required: ['productType', 'name', 'size', 'issuePricePct', 'underlyingSymbols', 'observationEveryMonths', 'observationCount', 'couponRatePct', 'couponAsStated', 'couponRateBasis', 'couponBarrierPct', 'memory', 'autocallLevelPct', 'autocallFromPeriod', 'knockInBarrierPct', 'protectionPct', 'participationPct'],
 };
 
 function system(today: string): string {
@@ -73,6 +73,7 @@ Rules:
 - Coupon: give the rate as stated and say whether it is per annum or per observation period; the conversion is done for you.
 - Schedule: a 12-month note observed quarterly has 4 observations every 3 months.
 - Barrier and autocall levels are % of the initial (strike) level.
+- Several underlyings ("worst of ETH and BTC", "on a basket of BTC, ETH, SOL") make a worst-of note: list every ticker.
 - Name: short, e.g. "12M Phoenix on ETH".`;
 }
 
@@ -84,13 +85,15 @@ function toParams(d: Draft, prompt: string, notes: string[]): { params: ProductP
   const dflt = <T>(v: T | null | undefined, fallback: T, note: string): T => { if (v === null || v === undefined) { if (note) notes.push(note); return fallback; } return v; };
   const every = dflt(d.observationEveryMonths, 3, 'Observation frequency not stated: quarterly assumed.');
   const count = dflt(d.observationCount, t === 'ppn' ? 1 : 4, `Number of observations not stated: ${t === 'ppn' ? 1 : 4} assumed.`);
-  const sym = (d.underlyingSymbol ?? '').toUpperCase().replace(/[^A-Z]/g, '') as keyof typeof FEEDS;
-  const feed = FEEDS[sym] ?? FEEDS.ETH; // unsupported symbols are refused before this
+  // Unsupported symbols are refused before this.
+  const syms = [...new Set((d.underlyingSymbols ?? []).map(cleanSymbol).filter(s => s in FEEDS))] as Array<keyof typeof FEEDS>;
+  const underlyings = syms.length ? syms.map(s => FEEDS[s]) : [FEEDS.ETH];
+  if (!syms.length) notes.push('Underlying not stated: ETH assumed.');
   const params: ProductParams = {
     productType: t,
-    name: d.name || `${PRODUCT_LABELS[t]} on ${feed.symbol}`,
+    name: d.name || `${PRODUCT_LABELS[t]} on ${underlyings.map(u => u.symbol).join('/')}`,
     issuePricePct: dflt(d.issuePricePct, 100, 'Issue price not stated: par (100%) assumed.'),
-    underlying: feed,
+    underlyings,
     observations: count,
   };
   const use = productUses(t);
@@ -124,7 +127,7 @@ export async function extractProduct(ai: AiRunner, prompt: string, product: Prod
     const draft = await ai.json<Draft>(messages, SCHEMA, 'term_sheet').catch(() => null);
     if (!draft) { errors = ['The reply was not valid JSON.']; continue; }
     draft.productType = draft.productType ?? product;
-    const bad = unsupportedUnderlying(draft.underlyingSymbol);
+    const bad = (draft.underlyingSymbols ?? []).map(unsupportedUnderlying).find(Boolean);
     if (bad) return { errors: [`There is no Chainlink price feed for ${bad} set up here yet; notes can be issued on ${SUPPORTED_UNDERLYINGS.join(', ')}.`] };
     const notes: string[] = [];
     const { params, schedule } = toParams(draft, prompt, notes);
@@ -137,7 +140,9 @@ export async function extractProduct(ai: AiRunner, prompt: string, product: Prod
 }
 
 /** An underlying named in the request that has no Chainlink feed configured here, if any. */
+const cleanSymbol = (s: string | null | undefined) => (s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
+
 export function unsupportedUnderlying(symbol: string | null | undefined): string | null {
-  const s = (symbol ?? '').toUpperCase().replace(/[^A-Z]/g, '');
+  const s = cleanSymbol(symbol);
   return s && !(s in FEEDS) ? s : null;
 }

@@ -81,6 +81,8 @@ pub fn eval(prog: &[Op], slots: &[Slot], kinds: &[u8]) -> Result<Option<i128>> {
             13 => { let y = pop!(); let x = pop!(); push!(b(x != 0 && y != 0)) }
             14 => { let y = pop!(); let x = pop!(); push!(b(x != 0 || y != 0)) }
             15 => { let x = pop!(); push!(b(x == 0)) }
+            16 => { let y = pop!(); let x = pop!(); push!(x.min(y)) }
+            17 => { let y = pop!(); let x = pop!(); push!(x.max(y)) }
             _ => return err!(EngineError::BadExpression),
         }
     }

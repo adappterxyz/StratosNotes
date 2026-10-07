@@ -11,3 +11,4 @@ export * from './client/engine';
 export * from './validate';
 export * from './draft';
 export * from './defview';
+export * from './templates';

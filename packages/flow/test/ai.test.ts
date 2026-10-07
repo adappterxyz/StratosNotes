@@ -57,7 +57,7 @@ describe('AI pipeline (scripted models)', () => {
   it('extracts a product, converting an annual coupon from the quoted words', async () => {
     const prompt = 'Phoenix on ETH, 10% p.a. paid quarterly, coupon barrier 70%, memory, autocall 100% from the 2nd quarter, knock-in 60%, one year, 50,000 USDC';
     const ai = fake({ intent: { choice: 'product', confidence: 0.9 }, product: { choice: 'phoenix', confidence: 0.9 } }, [{
-      productType: 'phoenix', name: '12M Phoenix on ETH', size: 50000, issuePricePct: null, underlyingSymbol: 'ETH', observationEveryMonths: 3, observationCount: 4,
+      productType: 'phoenix', name: '12M Phoenix on ETH', size: 50000, issuePricePct: null, underlyingSymbols: ['ETH'], observationEveryMonths: 3, observationCount: 4,
       couponRatePct: 2.5, couponAsStated: '10% p.a. paid quarterly', couponRateBasis: 'per-annum', couponBarrierPct: 70, memory: true,
       autocallLevelPct: 100, autocallFromPeriod: 2, knockInBarrierPct: 60, protectionPct: null, participationPct: null,
     }]);
@@ -65,13 +65,13 @@ describe('AI pipeline (scripted models)', () => {
     expect(r.kind).toBe('product');
     if (r.kind !== 'product') return;
     expect(r.params).toMatchObject({ productType: 'phoenix', couponRatePct: 2.5, couponBarrierPct: 70, memory: true, autocallLevelPct: 100, autocallFromPeriod: 2, knockInBarrierPct: 60, observations: 4 });
-    expect(r.params.underlying.symbol).toBe('ETH');
+    expect(r.params.underlyings.map(u => u.symbol)).toEqual(['ETH']);
     expect(r.schedule).toEqual({ every: 3, unit: 'months', count: 4, size: 50000 });
     expect(r.notes.join(' ')).toMatch(/10% p\.a\..*2\.5% per period/);
   });
   it('refuses an underlying with no Chainlink feed here', async () => {
     const ai = fake({ intent: { choice: 'product', confidence: 0.9 }, product: { choice: 'fcn', confidence: 0.9 } }, [{
-      productType: 'fcn', name: 'FCN on DOGE', size: null, issuePricePct: null, underlyingSymbol: 'DOGE', observationEveryMonths: 3, observationCount: 4,
+      productType: 'fcn', name: 'FCN on DOGE', size: null, issuePricePct: null, underlyingSymbols: ['DOGE'], observationEveryMonths: 3, observationCount: 4,
       couponRatePct: 2, couponAsStated: null, couponRateBasis: 'per-period', couponBarrierPct: null, memory: null, autocallLevelPct: 100, autocallFromPeriod: null, knockInBarrierPct: 60, protectionPct: null, participationPct: null,
     }]);
     const r = await runAi(ai, { prompt: 'FCN on DOGE, 2% quarterly, autocall 100, KI 60, 1y', today: '2026-10-06' });

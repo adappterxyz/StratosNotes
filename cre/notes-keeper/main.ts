@@ -6,8 +6,9 @@
 //     (JSON-RPC through the HTTP capability; each node computes the due list
 //     from finalized state and the DON agrees on it).
 //  2. For each due oracle step (strike fixing, observation k), reads the
-//     Chainlink price feed named in the definition through the EVM capability
-//     (finalized block, staleness-checked).
+//     Chainlink price feed of every underlying named in the definition (one
+//     for a single-asset note, several for a worst-of basket) through the EVM
+//     capability (finalized block, staleness-checked).
 //  3. Writes a DON-signed report to the engine through the keystone
 //     forwarder: on_report runs the step and everything after it that needs
 //     nobody (coupons, autocall, redemption), straight through.
@@ -149,8 +150,15 @@ export const onCron = (runtime: Runtime<Config>): string => {
   )
 
   const done: string[] = []
+  // A worst-of note reads one feed per underlying; read each feed once per run, whatever needs it.
+  const prices = new Map<string, bigint>()
+  const price = (f: DueOracle['feeds'][number]) => {
+    const k = `${f.feedChain}:${f.feed}:${f.staleness}`
+    if (!prices.has(k)) prices.set(k, readFeed(runtime, f))
+    return prices.get(k)!
+  }
   for (const d of due.slice(0, cfg.maxReportsPerRun)) {
-    const values = d.feeds.map(f => readFeed(runtime, f))
+    const values = d.feeds.map(price)
     // Forwarder layout: state, its authority PDA, then on_report's accounts.
     const accounts = [
       solanaAccountMeta(cfg.solana.forwarderState, true),

@@ -11,14 +11,14 @@ import { ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
 const CU: number[] = [];
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import {
-  compile, dec, encodeReport, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
-  parseBpmn, pda, reservePerUnit, simulatePayoff, slot, toBase, totalPerUnit, SCALE, type ProductParams, type ProductType,
+  compile, dec, encodeReport, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, FEEDS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
+  parseBpmn, pda, reservePerUnit, simulateWorstOf, slot, toBase, totalPerUnit, SCALE, type ProductParams, type ProductType,
 } from '../src';
 
 const RPC = process.env.E2E_RPC;
 const conn = RPC ? new Connection(RPC, 'confirmed') : (null as unknown as Connection);
 const CASH = 1; // asset index of USDC in product definitions
-const STRIKE = 2000;
+const STRIKES: Record<string, number> = { ETH: 2000, BTC: 60000, SOL: 150 };
 
 const provider = (kp: Keypair) => new AnchorProvider(conn, new Wallet(kp), { commitment: 'confirmed' });
 const chainNow = async () => (await conn.getBlockTime(await conn.getSlot('confirmed')))!;
@@ -29,8 +29,13 @@ async function funded() {
   return kp;
 }
 
-/** transfer: after the strike, investor 0 moves `units` of their notes to a new holder. */
-interface Run { type: ProductType; path: number[]; investors: number[]; transfer?: number }
+/**
+ * path: level at each observation, % of strike (one underlying); `paths` per
+ * observation, one entry per underlying of a worst-of basket.
+ * transfer: after the strike, investor 0 moves `units` of their notes to a new holder.
+ */
+interface Run { type: ProductType; path: number[] | number[][]; investors: number[]; transfer?: number; params?: ProductParams }
+const ETH_BTC: ProductParams = { ...EXAMPLE_PRODUCTS.fcn, name: '12M Worst-of FCN on ETH, BTC', underlyings: [FEEDS.ETH, FEEDS.BTC] };
 const RUNS: Run[] = [
   { type: 'fcn', path: [90, 104, 0, 0], investors: [600, 400] }, // autocalled at 2
   { type: 'fcn', path: [90, 95, 80, 50], investors: [700, 300] }, // knocked in: cash-settled at 0.5
@@ -38,7 +43,13 @@ const RUNS: Run[] = [
   { type: 'phoenix', path: [60, 65, 80, 75], investors: [250, 750], transfer: 100 }, // memory catches up at 3; part of a position changes hands
   { type: 'snowball', path: [90, 95, 99, 101], investors: [900, 100] }, // called at maturity
   { type: 'ppn', path: [130], investors: [400, 600] },
+  // Worst-of: SOL misses the coupon barrier at 1; at 2 every asset is above 100%: two coupons (memory) and the call.
+  { type: 'phoenix', params: EXAMPLE_WORST_OF, path: [[110, 120, 60], [105, 102, 101], [0, 0, 0], [0, 0, 0]], investors: [300, 700] },
+  // Worst-of: ETH falls to 50% at maturity while BTC is fine: cash-settled on the worst performer.
+  { type: 'fcn', params: ETH_BTC, path: [[95, 90], [90, 85], [80, 99], [50, 90]], investors: [600, 400] },
 ];
+const paramsOf = (r: Run) => r.params ?? EXAMPLE_PRODUCTS[r.type];
+const rows = (r: Run) => (r.path as Array<number | number[]>).map(x => (Array.isArray(x) ? x : [x]));
 
 describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
   let admin: Keypair, usdc: PublicKey, forwarderState: Keypair;
@@ -71,18 +82,19 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
   }
 
   it('issues, subscribes, observes and pays every product to its reference payoff', async () => {
-    const defs = new Map<ProductType, ReturnType<typeof compile>>();
-    for (const r of RUNS) if (!defs.has(r.type)) {
-      const prod = instantiateProduct(EXAMPLE_PRODUCTS[r.type]);
-      defs.set(r.type, compile(parseBpmn(prod.bpmnXml, prod.assets), { product: prod.params }));
+    const defs = new Map<string, ReturnType<typeof compile>>();
+    for (const r of RUNS) if (!defs.has(paramsOf(r).name)) {
+      const prod = instantiateProduct(paramsOf(r));
+      defs.set(paramsOf(r).name, compile(parseBpmn(prod.bpmnXml, prod.assets), { product: prod.params }));
     }
     // Publish each product's definition once (content-addressed: shared by its runs).
     const publisher = new Engine(provider(admin));
     for (const c of defs.values()) await publisher.publish(c);
 
     const results = await Promise.all(RUNS.map(async (run, idx) => {
-      const p: ProductParams = EXAMPLE_PRODUCTS[run.type];
-      const c = defs.get(run.type)!;
+      const p: ProductParams = paramsOf(run);
+      const c = defs.get(p.name)!;
+      const strikes = p.underlyings.map(u => STRIKES[u.symbol]);
       const issuerKp = await funded();
       const issuer = new Engine(provider(issuerKp));
       const definition = pda.definition(c.hash);
@@ -123,7 +135,7 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
 
       // CRE's job: the strike on the strike date, then each observation on its date.
       await until(strikeAt);
-      await report(process, definition, c.stepIndex.Task_FixStrike, [dec(STRIKE)]);
+      await report(process, definition, c.stepIndex.Task_FixStrike, strikes.map(s => dec(s)));
       // Secondary transfer, in part: later coupons and the redemption follow the units.
       if (run.transfer) {
         const buyer = await funded();
@@ -138,12 +150,12 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
       for (let k = 1; k <= p.observations; k++) {
         if ((await issuer.process(process)).status !== 0) break; // autocalled
         await until(obsAt[k - 1]);
-        await report(process, definition, c.stepIndex[`Task_Observe${k}`], [dec(STRIKE * run.path[k - 1] / 100)]);
+        await report(process, definition, c.stepIndex[`Task_Observe${k}`], rows(run)[k - 1].map((x, i) => dec(strikes[i] * x / 100)));
       }
       const final = await issuer.process(process);
 
       // Investors withdraw what they were paid, as SPL USDC.
-      const ref = simulatePayoff(p, STRIKE, run.path.map(x => STRIKE * x / 100));
+      const ref = simulateWorstOf(p, strikes, rows(run).map(r => r.map((x, i) => strikes[i] * x / 100)));
       const paid = await Promise.all(investors.map(async inv => {
         const owed = final.holdings.find(h => h.owner.equals(inv.kp.publicKey) && h.asset === CASH)?.amount ?? 0n;
         const base = toBase(owed, 6);
