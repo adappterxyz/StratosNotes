@@ -149,6 +149,7 @@ export default function Landing() {
             <span>StratosNotes</span>
           </a>
           <nav className="nav-links">
+            <a href="#demo">Demo</a>
             <a href="#how">How it works</a>
             <a href="#lifecycle">Lifecycle</a>
             <a href="#proof">Proof</a>
@@ -178,7 +179,7 @@ export default function Landing() {
               Chainlink CRE fix the strike, observe every date and pay every coupon and redemption, on either chain.
             </p>
             <div className="hero-cta" data-reveal data-reveal-d="3">
-              <a href="#lifecycle" className="btn btn-primary">Walk the lifecycle <span className="arrow">→</span></a>
+              <a href="#demo" className="btn btn-primary">Watch the demo <span className="arrow">→</span></a>
               <a href={APP_URL} className="btn btn-ghost">Issue a note</a>
             </div>
             <div className="pipeline-tags" data-reveal data-reveal-d="4">
@@ -191,6 +192,27 @@ export default function Landing() {
               <span className="chip"><i style={{ background: 'var(--blue)' }} /> Chainlink CRE observes</span>
               <span className="sep">↔</span>
               <span className="chip"><i style={{ background: 'var(--purple)' }} /> Ethereum via CCIP</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="demo">
+          <div className="wrap">
+            <div className="section-head" data-reveal>
+              <span className="eyebrow">Demo · 2 min</span>
+              <h2>From a template to a live note,<br /><span className="grad-text">in one sitting.</span></h2>
+              <p>The BPMN workflow behind a note, issuing it with this issuance's terms, an investor subscribing, and Chainlink CRE fixing the strike and observing on Solana devnet.</p>
+            </div>
+            <div className="demo-frame" data-reveal data-reveal-d="1">
+              <video controls playsInline preload="metadata" poster="/demo-poster.jpg" aria-label="StratosNotes demo video">
+                <source src="/demo.mp4" type="video/mp4" />
+                <a href="/demo.mp4">Download the demo video</a>
+              </video>
+            </div>
+            <div className="demo-links">
+              <a href={APP_URL}>Try it in the app</a>
+              <a href="/deck.pptx">Pitch deck (.pptx)</a>
+              <a href={REPO_URL} target="_blank" rel="noopener">Code on GitHub</a>
             </div>
           </div>
         </section>

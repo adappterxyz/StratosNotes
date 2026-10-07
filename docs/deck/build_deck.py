@@ -193,6 +193,22 @@ text(s, M, Inches(6.35), Inches(8), Inches(0.35),
      [[("sp.stratoslab.app", {"bold": True, "color": TEXT}), ("   ·   Solana devnet + Ethereum Sepolia", {"color": MUTED})]],
      size=16)
 
+# ---------- 2. Demo video ----------
+PUBLIC = Path(__file__).resolve().parents[2] / "landing" / "public"
+s = slide(
+    "Play the two-minute demo: the BPMN workflow behind a note, issuing it with this issuance's terms, an "
+    "investor subscribing, and Chainlink CRE fixing the strike and observing on Solana devnet. "
+    "Also online at sp.stratoslab.app/#demo."
+)
+title(s, "Two minutes, template to live note", kicker="Demo")
+vh = Inches(5.0)
+vw = int(vh * 16 / 9)
+s.shapes.add_movie(str(PUBLIC / "demo.mp4"), (W - vw) // 2, Inches(1.75), vw, vh,
+                   poster_frame_image=str(PUBLIC / "demo-poster.jpg"), mime_type="video/mp4")
+text(s, M, H - Inches(0.75), W - 2 * M, Inches(0.3), "Also at sp.stratoslab.app/#demo", size=12, color=MUTED,
+     align=PP_ALIGN.CENTER)
+footer(s, 2)
+
 # ---------- 2. Problem ----------
 s = slide(
     "Read the example coupon aloud. Someone has to watch those dates, read those prices and move the money. "
@@ -219,7 +235,7 @@ for head, sub, col in items:
     text(s, Inches(7.45), y + Inches(0.14), Inches(5.1), Inches(0.75),
          [[(head, {"bold": True, "size": 18})], [(sub, {"size": 14, "color": SOFT})]], space_after=0)
     y += Inches(1.14)
-footer(s, 2)
+footer(s, 3)
 
 # ---------- 3. What it does ----------
 s = slide(
@@ -252,7 +268,7 @@ for i, (head, sub) in enumerate(steps):
 text(s, M, Inches(5.95), W - 2 * M, Inches(0.65),
      "Five products: fixed coupon note, reverse convertible, phoenix with memory, snowball, principal-protected. "
      "One underlying or a worst-of basket of up to three. Cash or physical settlement.", size=14, color=MUTED)
-footer(s, 3)
+footer(s, 4)
 
 # ---------- 4. Architecture ----------
 s = slide(
@@ -302,7 +318,7 @@ text(s, Inches(7.35), Inches(4.3), Inches(3.5), Inches(0.35), "payouts out: ccip
 text(s, M, Inches(6.45), W - 2 * M, Inches(0.4),
      "Prices always come from Chainlink feeds; the lifecycle always runs on Solana; money and delivered tokens cross chains.",
      size=13, color=MUTED)
-footer(s, 4)
+footer(s, 5)
 
 # ---------- 5. Solana ----------
 s = slide(
@@ -332,7 +348,7 @@ for i, (head, sub) in enumerate(feats):
 text(s, M, Inches(6.15), W - 2 * M, Inches(0.4),
      [[("flow_engine", {"bold": True, "color": TEXT}),
        ("  ·  Anchor 0.31.1  ·  devnet 9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx", {"color": MUTED})]], size=13)
-footer(s, 5)
+footer(s, 6)
 
 # ---------- 6. CRE ----------
 s = slide(
@@ -401,7 +417,7 @@ for i, pt_col in enumerate([EMERALD] * 3 + [TEAL] * 3):
 text(s, Inches(6.4), Inches(6.2), Inches(6.33), Inches(0.3),
      [[("Phoenix on ETH", {"color": EMERALD, "bold": True}), ("   ·   ", {}),
        ("Worst-of ETH, BTC, SOL", {"color": TEAL, "bold": True})]], size=12, color=MUTED, align=PP_ALIGN.CENTER)
-footer(s, 6)
+footer(s, 7)
 
 # ---------- 7. Cross-chain ----------
 s = slide(
@@ -432,7 +448,7 @@ for i, (big, lab) in enumerate(stats):
     x = M + i * (tw + Inches(0.3))
     text(s, x, Inches(5.4), tw, Inches(0.6), big, size=30, bold=True, color=TEXT)
     text(s, x, Inches(6.0), tw, Inches(0.35), lab, size=14, color=MUTED)
-footer(s, 7)
+footer(s, 8)
 
 # ---------- 8. Evidence ----------
 s = slide(
@@ -466,7 +482,7 @@ text(s, M, Inches(5.65), W - 2 * M, Inches(0.8),
      "Worst-of: each CRE report carried three Chainlink prices; the engine computed perfK = min(obsK_i / initialLevel_i) "
      "on-chain and tested every barrier against it. Full transaction ids: docs/SUBMISSION.md and docs/crosschain.md.",
      size=13, color=SOFT)
-footer(s, 8)
+footer(s, 9)
 
 # ---------- 9. AI + templates ----------
 s = slide(
@@ -507,7 +523,7 @@ for t in tpls:
 text(s, rx + Inches(0.3), Inches(5.4), rw - Inches(0.6), Inches(0.8),
      "Each entry is signed by its author and recompiled against its definition address; forgeries are rejected.",
      size=12, color=MUTED)
-footer(s, 9)
+footer(s, 10)
 
 # ---------- 10. Tests ----------
 s = slide(
@@ -535,7 +551,7 @@ for i, (big, lab, sub) in enumerate(tests):
 text(s, M, Inches(6.0), W - 2 * M, Inches(0.65),
      "Also: unit tests for every product's BPMN round-trip, min / max, worst-of payoff and the AI pipeline; Foundry "
      "tests for the Sepolia faucet; the CRE workflow compiles with cre-compile.", size=13, color=MUTED)
-footer(s, 10)
+footer(s, 11)
 
 # ---------- 11. Limits and next ----------
 s = slide(
@@ -576,7 +592,7 @@ for t in nexts:
     dot(s, rx2 + Inches(0.3), y + Inches(0.08), EMERALD, d=Inches(0.12))
     text(s, rx2 + Inches(0.55), y, lw2 - Inches(0.85), Inches(0.55), t, size=14)
     y += Inches(0.6)
-footer(s, 11)
+footer(s, 12)
 
 # ---------- 12. Close ----------
 s = slide(

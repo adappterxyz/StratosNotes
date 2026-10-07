@@ -20,3 +20,4 @@ evm/lib/
 
 # CCIP relayer state (scripts/ccip-relayer.sh)
 .ccip-relayer/
+docs/1007.mp4
