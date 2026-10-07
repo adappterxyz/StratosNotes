@@ -293,7 +293,7 @@ export default function Landing() {
             </div>
             <div className="proof" data-reveal>
               <div className="cell"><div className="v">4</div><div className="k">CRE-driven or holder transactions after issuance, no operator</div></div>
-              <div className="cell"><div className="v">98k</div><div className="k">peak compute units per CRE report (three feeds in one), of the 300k cap</div></div>
+              <div className="cell"><div className="v">99k</div><div className="k">peak compute units per CRE report (three feeds in one), of the 300k cap</div></div>
               <div className="cell"><div className="v">12 / 12</div><div className="k">runs paid to the expected payoff on a local validator, incl. worst-of and physical delivery</div></div>
               <div className="cell"><div className="v">7 s</div><div className="k">from a plain-English term sheet to issuable terms with the AI</div></div>
             </div>
