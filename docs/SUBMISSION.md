@@ -198,7 +198,11 @@ back as a correct, validated workflow change.
   them.
 - Up to about 30 investors, 12 observations and 3 underlyings per issuance.
   Prices come from Chainlink feeds on Ethereum mainnet; the traded assets are
-  testnet tokens we registered with CCIP, not real USDC or ETH.
+  testnet tokens we registered with CCIP, not real USDC or ETH. We chose
+  our own burn-mint tokens (tUSD, tETH, tBTC, tSOL) so we control the
+  Sepolia ↔ Solana devnet lane and a faucet can mint demo amounts on
+  demand. A note's cash and delivery assets are mint addresses, so pointing
+  it at USDC on a supported lane needs no engine change.
 - The issuer's reserves are deposited on Solana in the app (the engine also
   accepts them from Ethereum over CCIP; there is no button for that yet).
 - An edited workflow's payoff is the workflow itself: the app charts a
