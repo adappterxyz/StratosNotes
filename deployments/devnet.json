@@ -106,6 +106,40 @@
         600,
         400
       ]
+    },
+    {
+      "type": "worst-of",
+      "name": "12M Worst-of Phoenix on ETH, BTC, SOL",
+      "process": "BJms7n2fnte2KH1SqRuoK6srxrMJFo2gYAe2K9ULXwwy",
+      "definition": "HEbDxpruBBYFFdUrEB7FDixqYEz82SvEKVzHpiDCYkzU",
+      "strikeAt": 1791367842,
+      "observations": [
+        1791368022,
+        1791368202,
+        1791368382,
+        1791368562
+      ],
+      "investors": [
+        600,
+        400
+      ]
+    },
+    {
+      "type": "worst-of",
+      "name": "12M Worst-of Phoenix on ETH, BTC, SOL",
+      "process": "3roU2adsWYjsgoqiveoo7QjGugUcME3FSYpPvauzuD3C",
+      "definition": "HEbDxpruBBYFFdUrEB7FDixqYEz82SvEKVzHpiDCYkzU",
+      "strikeAt": 1791368825,
+      "observations": [
+        1791369005,
+        1791369185,
+        1791369365,
+        1791369545
+      ],
+      "investors": [
+        600,
+        400
+      ]
     }
   ],
   "ccip": {
