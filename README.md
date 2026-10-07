@@ -62,10 +62,10 @@ diagrams exported from Flow import unchanged.
 
 | What | How |
 |---|---|
-| Every product pays its reference payoff | `npm run e2e`: six price paths (FCN autocalled and knocked in, reverse convertible, phoenix with memory, snowball called at maturity, PPN) on a local validator, two investors each, issued, subscribed, observed through a forwarder CPI, payouts withdrawn as SPL USDC and checked against the reference payoff |
+| Every product pays its reference payoff | `npm run e2e`: eight price paths (FCN autocalled and knocked in, reverse convertible, phoenix with memory, snowball called at maturity, PPN, a worst-of phoenix on ETH/BTC/SOL called with memory, a worst-of FCN on ETH/BTC knocked in by its worst performer) on a local validator, two investors each, issued, subscribed, observed through a forwarder CPI, payouts withdrawn as SPL USDC and checked against the reference payoff |
 | CRE drives a real issuance on devnet | `cre workflow simulate --broadcast`: the keeper found the due strike fixing, read ETH/USD from Chainlink, and wrote it through Chainlink's simulator forwarder into the devnet engine (≈50k compute units, under CRE's 300k cap); the next run delivered observation 1, the FCN autocalled, and both investors were paid par + coupon |
 | A full lifecycle on devnet, CRE on a schedule, with a secondary transfer | Phoenix `8SvcVvQ8vYAtVdLs4gF3Rc1MNybqWh2kFfPCTpD1heGG`: issued, subscribed 600 + 400 units, then the keeper loop (CRE simulator every minute) fixed the strike and delivered observations 1 and 2 with nobody else acting; after the strike one investor sold 100 of 600 units; observation 2 autocalled. Paid: 525, 420 and 105 USDC for 500, 400 and 100 units (two 2.5% coupons + par) |
-| Every report fits CRE's compute cap | the e2e run measures each forwarder transaction: max 89k compute units (CRE allows 300k) |
+| Every report fits CRE's compute cap | the e2e run measures each forwarder transaction: max 98k compute units with a three-asset basket (CRE allows 300k) |
 | AI | live Workers AI: term sheets to parameters (p.a. coupons converted, missing terms asked for, unsupported underlyings refused); edits to the open workflow as validated patches |
 | Compiler | unit tests: every product round-trips BPMN → IR → definition → bytes → decode, and BPMN → draft → BPMN |
 
@@ -87,7 +87,7 @@ diagrams exported from Flow import unchanged.
 | `solana/programs/mock_forwarder` | Local stand-in for the keystone forwarder (same CPI shape), for tests |
 | `packages/flow` | BPMN parser/builder, expression language, compiler + Borsh codec, products and reference payoff, keeper logic, client |
 | `cre/notes-keeper` | The Chainlink CRE workflow |
-| `app` | Marketplace, offering pages, self-service issuance, studio, portfolio (React + Solana wallet adapter), served at sp.stratoslab.app/app; its Worker also serves the landing page, the AI endpoint and the faucet (`npm run deploy` in `app` builds and deploys both) |
+| `app` | Marketplace (open and finished notes, filters), live note pages, the Issue workspace (templates, term sheet, AI, BPMN canvas, then Validate → Payoff → Template → Issue), portfolio (React + Solana wallet adapter), served at sp.stratoslab.app/app; its Worker also serves the landing page, the AI endpoint and the faucet (`npm run deploy` in `app` builds and deploys both) |
 | `landing` | The landing page at sp.stratoslab.app (built into the app Worker) |
 | `scripts/e2e.sh` | Every product end to end on a local validator |
 

@@ -40,6 +40,23 @@
         600,
         400
       ]
+    },
+    {
+      "type": "worst-of",
+      "name": "12M Worst-of Phoenix on ETH, BTC, SOL",
+      "process": "3o6EuEWkQ6now9b5TEd85BUEdQGeQfHGotDuLP1LPkUj",
+      "definition": "413NY4NrR5pKDZvxpBhjK3rKrynJ2qwMRVvyAxMc1GjK",
+      "strikeAt": 1791334216,
+      "observations": [
+        1791334336,
+        1791334456,
+        1791334576,
+        1791334696
+      ],
+      "investors": [
+        600,
+        400
+      ]
     }
   ]
 }

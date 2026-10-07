@@ -29,16 +29,19 @@ the same intermediaries.
 
 ## What StratosNotes does
 
-1. **Design.** Pick a payoff (fixed coupon note, reverse convertible, phoenix
-   with memory, snowball, principal-protected), describe it to the AI ("12M
-   phoenix on ETH, 10% p.a. quarterly, 70% barrier with memory…"), or open it
-   in the studio and change the workflow itself: add a fee, change a barrier,
-   pay a bonus on autocall. The AI asks for missing terms instead of
-   inventing them, and every edit is checked by the validator and compiler.
-2. **Issue.** Set this issuance's size, strike date and observation dates
-   (minutes apart for a demo, months for real), deposit a coupon reserve.
-   The note is a BPMN workflow (Issuer, Paying Agent, Investor) compiled to an
-   on-chain definition; the book opens on the marketplace.
+1. **Design.** In one workspace (Flow's): start from a template, a term sheet
+   (fixed coupon note, reverse convertible, phoenix with memory, snowball,
+   principal-protected) on one underlying or a worst-of basket of up to three,
+   a sentence to the AI ("12M phoenix on the worst of ETH and BTC, 10% p.a.
+   quarterly…"), or a blank canvas, and change the workflow itself: add a fee,
+   change a barrier, pay a bonus on autocall. The AI asks for missing terms
+   instead of inventing them, and every edit is checked by the validator and
+   compiler. A design can be saved as a template that any issuer can reuse.
+2. **Issue.** From the same workspace: set this issuance's size, strike date
+   and observation dates (minutes apart for a demo, months for real), deposit
+   a coupon reserve. The note is a BPMN workflow (Issuer, Paying Agent,
+   Investor) compiled to an on-chain definition; the book opens on the
+   marketplace, where open and finished notes are listed and filtered.
 3. **Sell.** Investors subscribe with USDC until the strike date; each
    subscription is one atomic USDC-for-note swap. Holders can transfer their
    units, in whole or in part; later coupons follow the units.
@@ -50,7 +53,7 @@ the same intermediaries.
 ## Architecture
 
 ```
-term sheet / AI / studio ─► BPMN workflow ─► compiler ─► definition (Solana account, by hash)
+template / term sheet / AI / canvas ─► BPMN workflow ─► compiler ─► definition (Solana account, by hash)
                                                               │
                                      flow_engine (one Anchor program) runs every issuance
                                                               ▲ on_report (forwarder CPI)
@@ -60,7 +63,7 @@ Chainlink feed (ETH, BTC, SOL) ─► CRE notes-keeper ─► keystone forwarder
 - `solana/programs/flow_engine`: the engine (Anchor 0.31.1), deployed on devnet at `9a5xpgRgK7NQMVtYvLuVq1XooK3Ca4CrKVkFEnVRGaHx`.
 - `packages/flow`: BPMN parser and builder, expression language, compiler and Borsh codec, structured products and their reference payoff, validator, AI pipeline (Cloudflare Workers AI: Clef routes and checks required terms, Kimi K2.6 extracts and edits), keeper logic, client.
 - `cre/notes-keeper`: the CRE workflow (TypeScript, `@chainlink/cre-sdk` 1.23).
-- `app`: marketplace, offering pages, issue form, studio, portfolio; a Cloudflare Worker with the AI endpoint and the test-USDC faucet.
+- `app`: marketplace, live note pages, the Issue workspace (templates, term sheet, AI, canvas, Validate → Payoff → Template → Issue), portfolio; a Cloudflare Worker with the AI endpoint, the template library and the test-USDC faucet.
 
 It is a rewrite, for Solana and CRE, of [Flow](https://flow.stratoslab.app)'s
 BPMN compiler and structured-product engines (Flow targets Canton/Daml);
@@ -85,11 +88,27 @@ coupons), exactly the reference payoff; the issuer's reserve kept the rest.
 An earlier FCN (`2eWVSt8MRqR8wMBu3ZWiWmj85YUdwzoACyyQWgT3Gu5B`) autocalled at
 its first CRE observation and paid 612 and 408 USDC for 600 and 400 units.
 
+**A worst-of basket on devnet, same keeper.** Phoenix on the worst of ETH, BTC
+and SOL `3o6EuEWkQ6now9b5TEd85BUEdQGeQfHGotDuLP1LPkUj`: each CRE report carried
+all three Chainlink prices; the engine computed the worst performance
+on-chain (`perfK = min(obsK_i / initialLevel_i)`) and tested every barrier
+against it.
+
+| Event | Transaction | Compute units |
+|---|---|---|
+| CRE fixes three strikes (ETH 2,698.11, BTC 85,512.70, SOL 121.64) | `2JoaJh49kYUaSPSWDiKTcquDLgriFvM3Pz1QzbX3ubFjb4hWE6mzvb7NbYKcmYN2Eyc9kigpgZYwENLu1YWSFroR` | 63,723 |
+| CRE observation 1: worst 100%, 3% coupon | `3GL2E2Q77txFoawfdu48YiHSbLfhwjxtPmVufZ9YDvdMxB8xAuBhLrpWxz9zs5pBYfzZtr2aZsJS1GyeV6HKTXe4` | 84,063 |
+| CRE observation 2: coupon, autocall, redemption | `42Q2F5oRjDKCYYJDFnZsSw5BrnfbyFxdn6hqqcvHXgif5mwr9pZFsaqUnPhm9JjQBi6ToVpRTFmUrLyocATNEjNB` | 99,231 |
+
+Paid: 636 and 424 USDC for 600 and 400 units (par plus two 3% coupons).
+
 **Tests.**
-- `npm run e2e`: all five products along six price paths on a local validator,
-  two investors each, one partial transfer mid-life; every payout equals the
-  reference payoff and is withdrawn as SPL USDC; every CRE report under 300k
-  compute units.
+- `npm run e2e`: all five products along eight price paths on a local
+  validator, including a worst-of phoenix on ETH, BTC and SOL and a worst-of
+  FCN knocked in by its worst performer; two investors each, one partial
+  transfer mid-life; every payout equals the reference payoff and is withdrawn
+  as SPL USDC; every CRE report under 300k compute units (max 98k, with three
+  feeds in one report).
 - Unit tests: every product round-trips BPMN → IR → definition → bytes, and
   BPMN → draft → BPMN; the AI pipeline (clarify instead of guess, coupon
   conversion, unsupported underlyings refused, validator-driven repair of edits).
@@ -109,8 +128,9 @@ validated workflow changes.
   engine already accepts the staging DON forwarder.
 - Note units live in the engine's ledger: transferable in whole or in part,
   but not SPL tokens yet, so wallets and DEXs do not show them.
-- Cash settlement only; up to about 30 investors and 12 observations per
-  issuance.
+- Cash settlement only; up to about 30 investors, 12 observations and 3
+  underlyings per issuance. Underlyings are price references only (Chainlink
+  feeds on Ethereum mainnet); nothing but test USDC is deposited.
 - Data is public on Solana; Flow's Canton target keeps it private.
 - Minute-apart observations often see the same price: ETH/USD and BTC/USD
   update hourly or on a 0.5% move, SOL/USD daily.

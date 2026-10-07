@@ -70,8 +70,8 @@ export default function TasksPanel({ o, onDone, hide = [] }: { o: Offering; onDo
         const decision = s.kind === KIND.XOR;
         const dep = s.ops.some(op => op.kind === OP.DEPOSIT);
         return (
-          <div key={s.id} className="stack" style={{ gap: 8, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-            <div className="spread"><strong>{names[s.id] ?? s.id}</strong><span className="small muted">{o.def.roles[s.role]}{s.until ? ' · repeatable' : ''}</span></div>
+          <div key={s.id} className="stack" style={{ gap: 8, borderTop: '1px solid hsl(var(--border))', paddingTop: 10 }}>
+            <div className="spread"><strong>{names[s.id] ?? s.id}</strong><span className="xs muted">{o.def.roles[s.role]}{s.until ? ' · repeatable' : ''}</span></div>
             {ins.map(f => (
               <div key={f.name} className="field">
                 <label htmlFor={`t-${s.id}-${f.name}`}>{f.name} <span className="muted">({KIND_NAME[f.kind]})</span></label>
@@ -80,8 +80,8 @@ export default function TasksPanel({ o, onDone, hide = [] }: { o: Offering; onDo
             ))}
             {dep && <span className="small muted">This step takes a USDC deposit from your wallet.</span>}
             {decision
-              ? <div className="row">{s.next.map((e, k) => <button key={k} className="btn ghost" disabled={!!busy} onClick={() => run(i, k)}>Go to {o.def.steps[e.target].id}</button>)}</div>
-              : <button className="btn" disabled={!!busy} onClick={() => run(i)}>{busy === s.id ? 'Sending…' : 'Complete'}</button>}
+              ? <div className="row">{s.next.map((e, k) => <button key={k} className="btn" disabled={!!busy} onClick={() => run(i, k)}>{names[o.def.steps[e.target].id] ?? o.def.steps[e.target].id}</button>)}</div>
+              : <button className="btn primary" disabled={!!busy} onClick={() => run(i)}>{busy === s.id ? 'Sending…' : 'Complete'}</button>}
           </div>
         );
       })}

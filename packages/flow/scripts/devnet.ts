@@ -10,7 +10,7 @@ import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/s
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { compile, dec, Engine, EXAMPLE_PRODUCTS, instantiateProduct, OPEN_ROLE, parseBpmn, pda, reservePerUnit, slot, type ProductType } from '../src';
+import { compile, dec, Engine, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, instantiateProduct, OPEN_ROLE, parseBpmn, pda, reservePerUnit, slot, type ProductType } from '../src';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const OUT = join(ROOT, 'deployments/devnet.json');
@@ -53,10 +53,10 @@ async function init() {
   save({ ...s, engine: eng.program.programId.toBase58(), config: pda.config().toBase58(), forwarders: FORWARDERS });
 }
 
-async function issue(type: ProductType) {
+async function issue(type: ProductType | 'worst-of') {
   const s = state();
   const usdc = new PublicKey(s.testUsdc);
-  const p = { ...EXAMPLE_PRODUCTS[type] };
+  const p = { ...(type === 'worst-of' ? EXAMPLE_WORST_OF : EXAMPLE_PRODUCTS[type]) };
   const prod = instantiateProduct(p);
   const c = compile(parseBpmn(prod.bpmnXml, prod.assets), { product: prod.params });
   const issuer = engineFor(payer);
@@ -116,6 +116,6 @@ async function transfer(processAddr: string, from: string, to: string, units: nu
 
 const [cmd, arg] = process.argv.slice(2);
 if (cmd === 'init') await init();
-else if (cmd === 'issue') await issue((arg as ProductType) ?? 'fcn');
+else if (cmd === 'issue') await issue((arg as ProductType | 'worst-of') ?? 'fcn');
 else if (cmd === 'transfer') await transfer(arg, process.argv[4], process.argv[5], Number(process.argv[6]));
 else console.log('usage: devnet.ts init | issue [fcn|reverse-convertible|phoenix|snowball|ppn]');

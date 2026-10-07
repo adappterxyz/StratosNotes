@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { Droplet } from 'lucide-react';
 import { DEPLOYMENT } from '../config';
 
 /** Devnet test USDC: open your token account (you pay its rent), then the faucet mints 2,000. */
@@ -34,9 +35,9 @@ export default function FaucetButton() {
     }
   };
   return (
-    <span className="row" style={{ gap: 8 }}>
-      <button className="btn ghost" onClick={get} disabled={state.busy} title="Devnet only: needs a little devnet SOL for fees (faucet.solana.com)">Get test USDC</button>
-      {state.text && <span className="small" role="status" style={{ color: state.bad ? 'var(--bad)' : 'var(--muted)', maxWidth: 220 }}>{state.text}</span>}
+    <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+      {state.text && <span className="xs" role="status" style={{ color: state.bad ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={state.text}>{state.text}</span>}
+      <button className="btn" onClick={get} disabled={state.busy} title="Devnet only: needs a little devnet SOL for fees (faucet.solana.com)"><Droplet className="i" />Test USDC</button>
     </span>
   );
 }
