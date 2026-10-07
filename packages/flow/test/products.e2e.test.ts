@@ -11,7 +11,7 @@ import { ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
 const CU: number[] = [];
 import { createMint, getOrCreateAssociatedTokenAccount, mintTo, getAccount, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import {
-  compile, dec, encodeReport, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, FEEDS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
+  compile, compileTemplate, dec, encodeReport, SEED_TEMPLATES, type TemplateSource, Engine, ENGINE_PROGRAM_ID, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, FEEDS, instantiateProduct, MOCK_FORWARDER_IDL, OPEN_ROLE,
   parseBpmn, pda, reservePerUnit, simulateWorstOf, slot, toBase, totalPerUnit, SCALE, type ProductParams, type ProductType,
 } from '../src';
 
@@ -34,7 +34,12 @@ async function funded() {
  * observation, one entry per underlying of a worst-of basket.
  * transfer: after the strike, investor 0 moves `units` of their notes to a new holder.
  */
-interface Run { type: ProductType; path: number[] | number[][]; investors: number[]; transfer?: number; params?: ProductParams }
+interface Run {
+  type: ProductType; path: number[] | number[][]; investors: number[]; transfer?: number; params?: ProductParams;
+  /** A custom template (edited workflow): `params` is its basis; `perUnit` what investors must get; `paFee` what the paying agent must collect. */
+  source?: TemplateSource; perUnit?: number; paFee?: number;
+}
+const seed = (part: string) => SEED_TEMPLATES.find(t => t.name.includes(part))!.source;
 const ETH_BTC: ProductParams = { ...EXAMPLE_PRODUCTS.fcn, name: '12M Worst-of FCN on ETH, BTC', underlyings: [FEEDS.ETH, FEEDS.BTC] };
 const RUNS: Run[] = [
   { type: 'fcn', path: [90, 104, 0, 0], investors: [600, 400] }, // autocalled at 2
@@ -47,6 +52,10 @@ const RUNS: Run[] = [
   { type: 'phoenix', params: EXAMPLE_WORST_OF, path: [[110, 120, 60], [105, 102, 101], [0, 0, 0], [0, 0, 0]], investors: [300, 700] },
   // Worst-of: ETH falls to 50% at maturity while BTC is fine: cash-settled on the worst performer.
   { type: 'fcn', params: ETH_BTC, path: [[95, 90], [90, 85], [80, 99], [50, 90]], investors: [600, 400] },
+  // Seed templates (custom workflows). Step-down: 96% at Q3 calls (level 95%), where the stock phoenix would not.
+  { type: 'phoenix', source: seed('Step-down'), params: seed('Step-down').basis, path: [80, 90, 96, 0], investors: [500, 500], perUnit: 1.075 },
+  // Servicing fee: investors get the plain phoenix payoff; the paying agent collects 0.1% of 1,000 with each of the 2 coupons paid.
+  { type: 'phoenix', source: seed('servicing fee'), params: seed('servicing fee').basis, path: [60, 65, 80, 75], investors: [500, 500], paFee: 2 },
 ];
 const paramsOf = (r: Run) => r.params ?? EXAMPLE_PRODUCTS[r.type];
 const rows = (r: Run) => (r.path as Array<number | number[]>).map(x => (Array.isArray(x) ? x : [x]));
@@ -84,6 +93,7 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
   it('issues, subscribes, observes and pays every product to its reference payoff', async () => {
     const defs = new Map<string, ReturnType<typeof compile>>();
     for (const r of RUNS) if (!defs.has(paramsOf(r).name)) {
+      if (r.source) { defs.set(paramsOf(r).name, compileTemplate(r.source)); continue; }
       const prod = instantiateProduct(paramsOf(r));
       defs.set(paramsOf(r).name, compile(parseBpmn(prod.bpmnXml, prod.assets), { product: prod.params }));
     }
@@ -96,6 +106,7 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
       const c = defs.get(p.name)!;
       const strikes = p.underlyings.map(u => STRIKES[u.symbol]);
       const issuerKp = await funded();
+      const paKp = Keypair.generate(); // the paying agent: runs only automatic steps, so it never signs
       const issuer = new Engine(provider(issuerKp));
       const definition = pda.definition(c.hash);
       const notional = run.investors.reduce((a, b) => a + b, 0);
@@ -104,7 +115,7 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
         const ata = await getOrCreateAssociatedTokenAccount(conn, admin, usdc, kp.publicKey);
         await mintTo(conn, admin, usdc, ata.address, admin, BigInt(units) * 1_000_000n);
       };
-      await mintCash(issuerKp, reserve);
+      await mintCash(issuerKp, reserve + (run.source ? notional / 100 : 0)); // custom templates may deposit more (e.g. fees)
 
       // Issuer: start, pre-trade terms (size, dates, reserve deposit), mandate.
       const id = BigInt(Date.now()) * 10n + BigInt(idx);
@@ -113,7 +124,7 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
       const strikeAt = t0 + 30;
       const obsAt = Array.from({ length: p.observations }, (_, k) => strikeAt + 5 * (k + 1));
       await issuer.send([
-        await issuer.startProcess(definition, id, [issuerKp.publicKey, issuerKp.publicKey, OPEN_ROLE], [PublicKey.default, usdc], c.stepIndex.Start_Issuer),
+        await issuer.startProcess(definition, id, [issuerKp.publicKey, paKp.publicKey, OPEN_ROLE], [PublicKey.default, usdc], c.stepIndex.Start_Issuer),
         await issuer.openVault(process, CASH, usdc),
       ]);
       await issuer.send([
@@ -163,15 +174,17 @@ describe.skipIf(!RPC)('structured products on Solana (local validator)', () => {
         const bal = (await getAccount(conn, getAssociatedTokenAddressSync(usdc, inv.kp.publicKey))).amount;
         return { units: inv.units, owed, wallet: bal };
       }));
-      return { run, final, ref, paid };
+      const paCash = Number(final.holdings.find(h => h.owner.equals(paKp.publicKey) && h.asset === CASH)?.amount ?? 0n) / Number(SCALE);
+      return { run, final, ref, paid, paCash };
     }));
 
     console.log(`report compute units: max ${Math.max(...CU)}, mean ${Math.round(CU.reduce((a, b) => a + b, 0) / CU.length)} over ${CU.length} reports`);
     expect(Math.max(...CU)).toBeLessThan(300_000); // CRE's cap for a Solana write
-    for (const { run, final, ref, paid } of results) {
+    for (const { run, final, ref, paid, paCash } of results) {
       expect(final.status, `${run.type} ${run.path} completed`).toBe(1);
+      expect(paCash, `${paramsOf(run).name}: paying agent fees`).toBeCloseTo(run.paFee ?? 0, 6);
       for (const x of paid) {
-        const expected = x.units * totalPerUnit(ref);
+        const expected = x.units * (run.perUnit ?? totalPerUnit(ref));
         expect(Number(x.owed) / Number(SCALE), `${run.type} ${run.path}: ${x.units} units`).toBeCloseTo(expected, 6);
         expect(Number(x.wallet) / 1e6, `${run.type}: withdrawn as USDC`).toBeCloseTo(expected, 5);
       }

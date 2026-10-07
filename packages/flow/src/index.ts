@@ -7,6 +7,7 @@ export * from './decode';
 export * from './products/params';
 export * from './products/payoff';
 export * from './products/instantiate';
+export * from './products/library';
 export * from './client/engine';
 export * from './validate';
 export * from './draft';
