@@ -7,10 +7,12 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 import './styles.css';
 import App from './App';
 import { RPC_URL } from './config';
+import { DemoWalletAdapter } from './lib/demoWallet';
 
 function Root() {
-  // Wallet Standard wallets (Phantom, Solflare, Backpack…) register themselves.
-  const wallets = useMemo(() => [], []);
+  // Wallet Standard wallets (Phantom, Solflare, Backpack…) register themselves;
+  // the two demo wallets let one person play issuer and investor.
+  const wallets = useMemo(() => [new DemoWalletAdapter('issuer'), new DemoWalletAdapter('investor')], []);
   return (
     <ConnectionProvider endpoint={RPC_URL}>
       <WalletProvider wallets={wallets} autoConnect>

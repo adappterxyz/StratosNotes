@@ -5,7 +5,7 @@
  * as the FAUCET_KEY secret); it mints to a token account the caller already
  * created, once per wallet per cooldown.
  */
-import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { createMintToInstruction, createTransferInstruction, getAssociatedTokenAddressSync } from '@solana/spl-token';
 import solanaTokens from '../deployments/solana-tokens.json';
 import { runAi } from '../packages/flow/src/ai/pipeline';
@@ -25,6 +25,9 @@ interface Env {
 
 const AMOUNT = 2_000n * 1_000_000n; // 2,000 test USDC (6 decimals)
 const COOLDOWN_SEC = 600;
+/** Devnet SOL per drip: enough to issue a note (its account and vaults) or subscribe several times. */
+const SOL_DRIP_LAMPORTS = 100_000_000;
+const SOL_DRIPS_PER_IP_HOUR = 6;
 const SITE = 'https://sp.stratoslab.app';
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
@@ -39,7 +42,7 @@ const TOKEN_DRIP: Record<string, { units: number }> = { tETH: { units: 5 }, tBTC
 async function faucet(req: Request, env: Env): Promise<Response> {
   const body = await req.json().catch(() => null) as { owner?: string; blockhash?: string; token?: string } | null;
   const token = body?.token ?? 'tUSD';
-  if (token !== 'tUSD' && !TOKEN_DRIP[token]) return json({ error: `No faucet for ${token}.` }, 400);
+  if (token !== 'tUSD' && token !== 'SOL' && !TOKEN_DRIP[token]) return json({ error: `No faucet for ${token}.` }, 400);
   let owner: PublicKey;
   try { owner = new PublicKey(body?.owner ?? ''); } catch { return json({ error: 'Send { "owner": "<wallet address>", "blockhash": "<recent blockhash>" }.' }, 400); }
   if (!body?.blockhash || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(body.blockhash)) return json({ error: 'A recent blockhash is required.' }, 400);
@@ -48,6 +51,21 @@ async function faucet(req: Request, env: Env): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
   if (now - last < COOLDOWN_SEC) return json({ error: `Already sent; try again in ${Math.ceil((COOLDOWN_SEC - (now - last)) / 60)} min.` }, 429);
   const signer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(env.FAUCET_KEY)));
+  if (token === 'SOL') {
+    // Devnet SOL for fees and rent (a wallet with none cannot open a token account),
+    // capped per address and per IP so the faucet's own SOL lasts.
+    const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown';
+    const bucket = `faucet:SOL:ip:${ip}:${Math.floor(now / 3600)}`;
+    const used = Number(await env.FAUCET.get(bucket) ?? 0);
+    if (used >= SOL_DRIPS_PER_IP_HOUR) return json({ error: 'Devnet SOL limit reached for this hour; try faucet.solana.com.' }, 429);
+    const tx = new Transaction().add(SystemProgram.transfer({ fromPubkey: signer.publicKey, toPubkey: owner, lamports: SOL_DRIP_LAMPORTS }));
+    tx.feePayer = signer.publicKey;
+    tx.recentBlockhash = body.blockhash;
+    tx.sign(signer);
+    await env.FAUCET.put(key, String(now), { expirationTtl: COOLDOWN_SEC * 2 });
+    await env.FAUCET.put(bucket, String(used + 1), { expirationTtl: 7200 });
+    return json({ transaction: btoa(String.fromCharCode(...tx.serialize())), amount: String(SOL_DRIP_LAMPORTS / 1e9), token });
+  }
   if (token !== 'tUSD') {
     // tETH/tBTC/tSOL: a transfer from the faucet's own stock (the caller has opened its token account).
     const t = (solanaTokens as Record<string, { mint: string; decimals: number }>)[token];

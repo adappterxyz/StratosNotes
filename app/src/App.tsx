@@ -7,6 +7,7 @@ import OfferingPage from './pages/Offering';
 import Portfolio from './pages/Portfolio';
 import Workspace from './pages/Workspace';
 import FaucetButton from './components/FaucetButton';
+import RoleSwitch from './components/RoleSwitch';
 import { DEPLOYMENT, explorer } from './config';
 
 function ThemeToggle() {
@@ -40,6 +41,7 @@ export default function App() {
         <div className="right">
           <span className="pill plain" title="Every note runs on the StratosNotes engine on Solana devnet"><span className="dot" style={{ color: 'hsl(var(--primary))' }} />Solana devnet</span>
           <FaucetButton />
+          <RoleSwitch />
           <WalletMultiButton />
           <ThemeToggle />
         </div>
