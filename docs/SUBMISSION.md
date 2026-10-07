@@ -12,6 +12,7 @@ and delivered tokens between the chains.
 - Site: https://sp.stratoslab.app
 - App: https://sp.stratoslab.app/app (Solana devnet + Ethereum Sepolia; test-token faucets built in)
 - Code: https://github.com/adappterxyz/StratosNotes
+- Deck: https://sp.stratoslab.app/deck.pptx
 - Demo script: [DEMO.md](DEMO.md) · Cross-chain details and transactions: [crosschain.md](crosschain.md)
 
 ## Tracks
