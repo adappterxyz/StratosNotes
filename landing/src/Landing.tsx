@@ -10,6 +10,14 @@ const EXPLORER = (tx: string) => `https://explorer.solana.com/tx/${tx}?cluster=d
 
 const CHAIN: Chain = 'solana';
 
+// The cross-chain flow, as it ran on the testnets.
+const XC_FLOW = [
+  { title: 'Subscribe', dir: 'ltr', left: 'Investor sends 300 tUSD and "subscribe 300 units"', via: 'CCIP', time: '35–40 min', right: 'The engine runs the subscription for their Ethereum address' },
+  { title: 'Observe', dir: 'here', left: '', via: 'CRE', time: 'every date', right: 'CRE fixes the strike, observes, pays coupons and the redemption' },
+  { title: 'Pay out', dir: 'rtl', left: 'tUSD lands at the investor\'s address', via: 'CCIP', time: '~1 min', right: 'CRE locks the payout in a signed report; a relay sends it' },
+  { title: 'Deliver', dir: 'rtl', left: 'tETH, tBTC or tSOL, units ÷ strike', via: 'CCIP', time: '~1 min', right: 'Physically settled notes deliver the worst performer\'s token' },
+];
+
 // The devnet run: a phoenix on ETH that Chainlink CRE ran end to end.
 const RUN = [
   { what: 'CRE fixes the strike', detail: 'ETH 2,699.34', tx: '2VxTRWLpY7oD3AD65uE3mo8bfd242xNG5fgTVD3HAik7CN6hFLybKcDdD63EY4fYPXmUn8uK4iTR4UzrkRooQj2r', cu: '51,394' },
@@ -144,6 +152,7 @@ export default function Landing() {
             <a href="#how">How it works</a>
             <a href="#lifecycle">Lifecycle</a>
             <a href="#proof">Proof</a>
+            <a href="#crosschain">Cross-chain</a>
             <a href="#solana">Solana</a>
             <a href={REPO_URL} target="_blank" rel="noopener">Code</a>
           </nav>
@@ -158,15 +167,15 @@ export default function Landing() {
           <div className="wrap hero-inner">
             <div className="badge" data-reveal>
               <span className="dot" />
-              <span><b>Live on Solana devnet</b> · observed by Chainlink CRE</span>
+              <span><b>Live on Solana devnet</b> · Ethereum investors via CCIP · observed by Chainlink CRE</span>
             </div>
             <h1 data-reveal data-reveal-d="1">
               The structured note lifecycle,<br /><span className="grad-text">on Solana.</span>
             </h1>
             <p className="sub" data-reveal data-reveal-d="2">
               Design a note on one asset or a worst-of basket, from a template, a term sheet, a sentence or a
-              BPMN diagram. Sell it for USDC, let holders transfer it, and let Chainlink CRE fix the strike,
-              observe every date and trigger every coupon, autocall and redemption, all on Solana.
+              BPMN diagram. Sell it for USDC to investors on Solana or Ethereum, let holders transfer it, and let
+              Chainlink CRE fix the strike, observe every date and pay every coupon and redemption, on either chain.
             </p>
             <div className="hero-cta" data-reveal data-reveal-d="3">
               <a href="#lifecycle" className="btn btn-primary">Walk the lifecycle <span className="arrow">→</span></a>
@@ -180,6 +189,8 @@ export default function Landing() {
               <span className="chip"><i style={{ background: 'var(--cyan)' }} /> Solana devnet</span>
               <span className="sep">→</span>
               <span className="chip"><i style={{ background: 'var(--blue)' }} /> Chainlink CRE observes</span>
+              <span className="sep">↔</span>
+              <span className="chip"><i style={{ background: 'var(--purple)' }} /> Ethereum via CCIP</span>
             </div>
           </div>
         </section>
@@ -282,8 +293,8 @@ export default function Landing() {
             </div>
             <div className="proof" data-reveal>
               <div className="cell"><div className="v">4</div><div className="k">CRE-driven or holder transactions after issuance, no operator</div></div>
-              <div className="cell"><div className="v">87.6k</div><div className="k">peak compute units per CRE report, of the 300k cap</div></div>
-              <div className="cell"><div className="v">5 / 5</div><div className="k">payoffs paid to the reference on a local validator, 6 price paths</div></div>
+              <div className="cell"><div className="v">98k</div><div className="k">peak compute units per CRE report (three feeds in one), of the 300k cap</div></div>
+              <div className="cell"><div className="v">12 / 12</div><div className="k">runs paid to the expected payoff on a local validator, incl. worst-of and physical delivery</div></div>
               <div className="cell"><div className="v">7 s</div><div className="k">from a plain-English term sheet to issuable terms with the AI</div></div>
             </div>
             <div className="ledger" data-reveal>
@@ -306,6 +317,54 @@ export default function Landing() {
                   {PAID.map(p => <tr key={p.holder}><td>{p.holder}</td><td className="r">{p.units}</td><td className="r"><b>{p.usdc}</b></td></tr>)}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="crosschain">
+          <div className="wrap">
+            <div className="section-head" data-reveal>
+              <span className="eyebrow">Cross-chain · Chainlink CCIP</span>
+              <h2>One note. <span className="grad-text">Investors on two chains.</span></h2>
+              <p>The lifecycle runs on Solana. Investors on Ethereum subscribe with their own tokens and are paid back where they are: Chainlink CCIP carries the money, Chainlink CRE decides every payout.</p>
+            </div>
+            <div className="xc" data-reveal>
+              <div className="xc-head">
+                <div className="xc-lane"><img src="/logos/chains/ethereum-w.svg" alt="" /> Ethereum Sepolia</div>
+                <div className="xc-lane mid"><img src="/logos/chainlink.svg" alt="" /> Chainlink</div>
+                <div className="xc-lane"><img src="/logos/chains/solana-w.svg" alt="" /> Solana devnet</div>
+              </div>
+              {XC_FLOW.map(r => (
+                <div key={r.title} className={`xc-row ${r.dir}`}>
+                  <div className="xc-cell">{r.left}</div>
+                  <div className="xc-arrow"><span className="xc-label">{r.via}</span><span className="xc-line" /><span className="xc-time">{r.time}</span></div>
+                  <div className="xc-cell">{r.right}</div>
+                  <div className="xc-title">{r.title}</div>
+                </div>
+              ))}
+            </div>
+            <div className="chain-cards" style={{ marginTop: 22 }}>
+              <div className="chain-card" data-reveal>
+                <div className="logo">Subscribe from either chain</div>
+                <span className="status-pill verified"><i />Live on testnets</span>
+                <p>Solana investors swap USDC for units in one transaction. Ethereum investors send tUSD and a subscribe call over CCIP; the engine runs the same subscription for their address, or refunds it if the book closed while it travelled.</p>
+              </div>
+              <div className="chain-card" data-reveal data-reveal-d="1">
+                <div className="logo">CRE pays both chains</div>
+                <span className="status-pill verified"><i />Live on testnets</span>
+                <p>For every Ethereum holder with a coupon or redemption due, CRE writes a DON-signed payout report: the engine locks the amount for CCIP, and any relay delivers it, only to that address and only that amount.</p>
+              </div>
+              <div className="chain-card" data-reveal data-reveal-d="2">
+                <div className="logo">Delivery in tokens, on either chain</div>
+                <span className="status-pill"><i />tUSD · tETH · tBTC · tSOL</span>
+                <p>Cash and the deliverable underlyings are CCIP cross-chain tokens on both chains. A physically settled note delivers units ÷ strike of the worst performer, to Solana holders in place and to Ethereum holders over CCIP.</p>
+              </div>
+            </div>
+            <div className="proof" data-reveal style={{ marginTop: 22 }}>
+              <div className="cell"><div className="v">~1 min</div><div className="k">Solana → Ethereum: payouts and deliveries</div></div>
+              <div className="cell"><div className="v">35–40 min</div><div className="k">Ethereum → Solana: subscriptions (Ethereum finality first)</div></div>
+              <div className="cell"><div className="v">421 tUSD + tETH</div><div className="k">reached an Ethereum investor from three notes run on Solana, incl. a physical delivery</div></div>
+              <div className="cell"><div className="v">0</div><div className="k">manual steps for Ethereum payouts: CRE locks, the relay delivers</div></div>
             </div>
           </div>
         </section>
@@ -388,7 +447,7 @@ export default function Landing() {
                 <div className="logo"><img src="/logos/chains/solana-w.svg" alt="" /> An open market</div>
                 <span className="status-pill"><i />Self-service</span>
                 <p>Anyone can issue from a template or their own design, and anyone can subscribe: each subscription is one atomic USDC-for-note swap.</p>
-                <ul><li>Open books until the strike date</li><li>Transfers in whole or in part</li><li>A shared template library</li></ul>
+                <ul><li>Open books until the strike date</li><li>Investors on Solana or Ethereum</li><li>Transfers in whole or in part, even to an Ethereum address</li></ul>
                 <span className="foot-note">sp.stratoslab.app/app</span>
               </div>
             </div>
@@ -417,11 +476,12 @@ export default function Landing() {
           <div className="foot-links">
             <a href="#lifecycle">Lifecycle</a>
             <a href="#proof">Proof</a>
+            <a href="#crosschain">Cross-chain</a>
             <a href="#solana">Solana</a>
             <a href={FLOW_URL} target="_blank" rel="noopener">StratosFlow</a>
             <a href={REPO_URL} target="_blank" rel="noopener">GitHub</a>
           </div>
-          <small>© {new Date().getFullYear()} StratosNotes · by Stratos Lab · Solana · Chainlink CRE</small>
+          <small>© {new Date().getFullYear()} StratosNotes · by Stratos Lab · Solana · Chainlink CRE · CCIP</small>
         </div>
       </footer>
     </div>

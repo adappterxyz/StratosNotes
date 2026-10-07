@@ -143,7 +143,8 @@ landing on Sepolia 50 seconds later. Then automatic: on phoenix
 `8DtC17ArCQiCPiGezSB1dYfViA3SAoKTE7JynGX7gHe2`, where 100 units had moved to
 the same Ethereum address, CRE locked each coupon and the redemption for CCIP
 in a DON-signed payout report as they fell due, a relay delivered them, and
-110 tUSD reached Sepolia with nobody acting. Every step and its transaction:
+110 tUSD reached Sepolia with nobody acting. A physically settled note then
+delivered tETH to the same Ethereum address (units ÷ strike), also over CCIP. Every step and its transaction:
 [crosschain.md](crosschain.md).
 
 **The template library, seeded.** Six templates are published on devnet and

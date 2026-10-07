@@ -152,3 +152,21 @@ tUSD went from 306 to 416 (+110, the reference payoff), with nobody acting.
 First delivery: locked 08:43:48, sent 08:43:57
 (`2weGxh8Qcyjhj7CcAwmFqcvNpYB5uaVJ1q6AbQLpGbjaxPXt6NkSkjbdv6jakGrEEkj2mLnWFDizBBBeNHKGWW8b`);
 redemption: `2C9Nn9R66qEPnQ1P2VGcyU5pdKHqXBsgGhk1LV7pHgTPwd8ti775aRmT3YmyKezs7bEvvu6auByzfRmpogfMGCZc`.
+
+## Physical delivery to an Ethereum holder (live, 2026-10-07)
+
+Reverse convertible on ETH, physically settled, knock-in set at 101% so a flat
+market knocks it in: `CviXTYq7RJPy7rt5Nw5riHcJXvpSqW8DNByhL9sd4d4C`. A Solana
+investor moved 100 units to `0x8ba8…2568`. CRE paid the two 2.5% coupons and,
+at maturity, the engine delivered tETH (units ÷ strike) instead of cash; CRE
+locked each balance in a payout report and the relay sent them over CCIP:
+
+| Payout | Arrived on Sepolia | Relay transaction (Solana) |
+|---|---|---|
+| 5 tUSD (two coupons) | yes | `5F4h5qxTURa18HurF1vGqbaCUPRMYaeJGCAWUy5d2U2A4wXxLT3ndhACjscYvhUguyjpVacarXtFzfig6S1Br3HY` |
+| 0.03824647 tETH (100 ÷ 2,614.62 strike) | yes | `5kD1hczfGLpyqPF3JsXFoRLmeZ3GbDDR7VTRwZpRftFemv4jyXkKbLCQsst6K6LhybTfrJ4yVGJDJj5kXrEn3KJY` |
+
+So a note can be subscribed and paid on either chain, in cash or in the
+underlying's token. What crosses chains is the money and the delivered
+tokens; prices always come from Chainlink feeds on Ethereum mainnet, and the
+lifecycle always runs on Solana.

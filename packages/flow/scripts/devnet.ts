@@ -10,7 +10,7 @@ import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/s
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { CCIP, ccipPda, ENGINE_PROGRAM_ID, compile, dec, Engine, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, instantiateProduct, OPEN_ROLE, parseBpmn, pda, reservePerUnit, slot, type ProductType } from '../src';
+import { CCIP, ccipPda, ENGINE_PROGRAM_ID, compile, dec, Engine, EXAMPLE_PRODUCTS, EXAMPLE_WORST_OF, instantiateProduct, OPEN_ROLE, parseBpmn, pda, reservePerUnit, slot, type ProductParams, type ProductType } from '../src';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const OUT = join(ROOT, 'deployments/devnet.json');
@@ -56,7 +56,12 @@ async function init() {
 async function issue(type: ProductType | 'worst-of') {
   const s = state();
   const usdc = new PublicKey(s.testUsdc);
-  const p = { ...(type === 'worst-of' ? EXAMPLE_WORST_OF : EXAMPLE_PRODUCTS[type]) };
+  const p: ProductParams = { ...(type === 'worst-of' ? EXAMPLE_WORST_OF : EXAMPLE_PRODUCTS[type]) };
+  // Overrides for live tests: PHYSICAL=1 (physical delivery), KI=<% of strike>, OBS=<observations>.
+  if (process.env.PHYSICAL) p.settlement = 'physical';
+  if (process.env.KI) p.knockInBarrierPct = Number(process.env.KI);
+  if (process.env.OBS) p.observations = Number(process.env.OBS);
+  if (process.env.PHYSICAL || process.env.KI || process.env.OBS) p.name = `${p.name} (${p.settlement === 'physical' ? 'physical' : 'cash'}, KI ${p.knockInBarrierPct}%)`;
   const prod = instantiateProduct(p);
   const c = compile(parseBpmn(prod.bpmnXml, prod.assets), { product: prod.params });
   const issuer = engineFor(payer);
@@ -84,17 +89,30 @@ async function issue(type: ProductType | 'worst-of') {
   const obs = Array.from({ length: p.observations }, (_, k) => strikeAt + every * (k + 1));
   const id = BigInt(now);
   const proc = pda.process(definition, payer.publicKey, id);
+  // One mint per token asset: test USDC for cash, the cross-chain token for each deliverable underlying.
+  const tokens = JSON.parse(readFileSync(join(ROOT, 'deployments/solana-tokens.json'), 'utf8')) as Record<string, { mint: string; decimals: number; multisig: string }>;
+  const mints = prod.assets.map(a => (a.kind === 'cash' ? (a.token && a.token !== 'tUSD' ? new PublicKey(tokens[a.token].mint) : usdc) : PublicKey.default));
   await issuer.send([
-    await issuer.startProcess(definition, id, [payer.publicKey, payer.publicKey, OPEN_ROLE], [PublicKey.default, usdc], c.stepIndex.Start_Issuer),
-    await issuer.openVault(proc, 1, usdc),
+    await issuer.startProcess(definition, id, [payer.publicKey, payer.publicKey, OPEN_ROLE], mints, c.stepIndex.Start_Issuer),
+    ...await Promise.all(mints.map((m, i) => (m.equals(PublicKey.default) ? null : issuer.openVault(proc, i, m))).filter(Boolean) as Promise<import('@solana/web3.js').TransactionInstruction>[]),
   ]);
   await issuer.send([
     await issuer.executeStep(proc, definition, c.stepIndex.Task_ApproveTerms, [
       slot.text(`XSDEMO${String(now).slice(-6)}`), slot.number(dec(notional)), slot.number(BigInt(strikeAt)),
       ...obs.map(t => slot.number(BigInt(t))), slot.number(dec(reserve)),
     ], { deposit: { asset: 1, mint: usdc } }),
-    await issuer.executeStep(proc, definition, c.stepIndex.Task_Mandate, []),
   ]);
+  // Physical delivery: the issuer (a member of each token's mint multisig) mints and deposits a reserve.
+  for (const [i, a] of prod.assets.entries()) {
+    if (!a.token || a.token === 'tUSD' || a.kind !== 'cash') continue;
+    const sym = a.id.slice(2); // d_ETH -> ETH
+    const t = tokens[a.token];
+    const units = Number(process.env[`RESERVE_${sym}`] ?? notional / 1000); // e.g. 1,000 units / ~2,600 ETH ≈ 0.4 tETH
+    const ata = await getOrCreateAssociatedTokenAccount(conn, payer, mints[i], payer.publicKey);
+    await mintTo(conn, payer, mints[i], ata.address, new PublicKey(t.multisig), BigInt(Math.ceil(units * 10 ** t.decimals)), [payer]);
+    await issuer.send([await issuer.executeStep(proc, definition, c.stepIndex[`Task_DeliveryReserve_${sym}`], [slot.number(dec(units))], { deposit: { asset: i, mint: mints[i] } })]);
+  }
+  await issuer.send([await issuer.executeStep(proc, definition, c.stepIndex.Task_Mandate, [])]);
   for (const [i, u] of units.entries()) {
     const kp = demoKey(`investor${i + 1}`);
     await fund(kp.publicKey, 0.02);
